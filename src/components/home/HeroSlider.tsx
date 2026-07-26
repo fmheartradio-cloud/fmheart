@@ -41,7 +41,7 @@ export function HeroSlider() {
         <span className="mb-3 inline-flex w-fit bg-fh-red px-3 py-1 font-heading text-xs font-extrabold tracking-wider text-white uppercase">
           {slide.category}
         </span>
-        <h1 className="animate-fade-up max-w-3xl font-heading text-2xl font-extrabold leading-snug text-white md:text-4xl lg:text-[2.75rem]">
+        <h1 className="font-davasa animate-fade-up max-w-3xl text-2xl font-bold leading-snug text-white md:text-4xl lg:text-[2.75rem]">
           {slide.title}
         </h1>
         {slide.excerpt && (
