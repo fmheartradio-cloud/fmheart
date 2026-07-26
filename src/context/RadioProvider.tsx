@@ -51,8 +51,24 @@ const DEFAULT_META: RadioMeta = {
 const POLL_MS = 15_000;
 const MAX_RECENT = 8;
 
-/** Same-origin proxy — enables real FFT spectrum via Web Audio. */
+/** Same-origin proxy — enables real FFT spectrum via Web Audio (Chromium). */
 const PROXY_STREAM = "/api/radio-stream";
+
+/**
+ * Safari / all iOS browsers: createMediaElementSource on live Icecast often
+ * mutes audio or returns empty analyser data. Use plain <audio> + direct URL.
+ */
+function useSimpleAudioPath() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  const iOS =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const safariDesktop =
+    /Safari/.test(ua) &&
+    !/Chrome|Chromium|CriOS|Edg|Firefox|FxiOS|OPR|Android/i.test(ua);
+  return iOS || safariDesktop;
+}
 
 function formatClock(d = new Date()) {
   return d.toLocaleTimeString("en-GB", {
@@ -66,6 +82,20 @@ function trackKey(song: string, artist: string) {
   return `${song.trim().toLowerCase()}::${artist.trim().toLowerCase()}`;
 }
 
+function streamUrls(simple: boolean) {
+  const bust = Date.now();
+  if (simple) {
+    return [
+      `${SITE.streamUrl}?t=${bust}`,
+      `${PROXY_STREAM}?t=${bust}`,
+    ];
+  }
+  return [
+    `${PROXY_STREAM}?t=${bust}`,
+    `${SITE.streamUrl}?t=${bust}`,
+  ];
+}
+
 export function RadioProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
@@ -74,6 +104,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const prevMetaRef = useRef<RadioMeta>(DEFAULT_META);
   const wantPlayRef = useRef(false);
+  const simplePathRef = useRef(false);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -85,7 +116,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
 
   const ensureGraph = useCallback(async () => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || simplePathRef.current) return;
 
     if (!ctxRef.current) {
       const Ctx =
@@ -102,7 +133,6 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       const gain = ctx.createGain();
       gain.gain.value = volume;
 
-      // createMediaElementSource can only be called once per element
       const source = ctx.createMediaElementSource(audio);
       source.connect(analyserNode);
       analyserNode.connect(gain);
@@ -121,10 +151,18 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   }, [volume]);
 
   useEffect(() => {
+    simplePathRef.current = useSimpleAudioPath();
+
     const audio = new Audio();
     audio.preload = "none";
-    // Same-origin proxy → Web Audio analyser works (no CORS needed)
-    audio.crossOrigin = "anonymous";
+    audio.playsInline = true;
+    audio.setAttribute("playsinline", "true");
+    audio.setAttribute("webkit-playsinline", "true");
+
+    if (!simplePathRef.current) {
+      audio.crossOrigin = "anonymous";
+    }
+
     audioRef.current = audio;
 
     const onPlaying = () => {
@@ -138,11 +176,15 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     const onError = () => {
       setIsLoading(false);
       setIsPlaying(false);
-      // Auto-reconnect once if user still wants play (proxy timeout / drop)
       if (wantPlayRef.current) {
         window.setTimeout(() => {
           if (!wantPlayRef.current || !audioRef.current) return;
-          audioRef.current.src = `${PROXY_STREAM}?t=${Date.now()}`;
+          const urls = streamUrls(simplePathRef.current);
+          const next = urls[0]!;
+          if (simplePathRef.current) {
+            audioRef.current.removeAttribute("crossOrigin");
+          }
+          audioRef.current.src = next;
           audioRef.current.load();
           void audioRef.current.play().catch(() => {
             setError("Stream එක connect වුණේ නැහැ. නැවත try කරන්න.");
@@ -179,9 +221,9 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (gainRef.current) {
+    if (gainRef.current && !simplePathRef.current) {
       gainRef.current.gain.value = volume;
-    } else if (audioRef.current && !sourceRef.current) {
+    } else if (audioRef.current) {
       audioRef.current.volume = volume;
     }
   }, [volume]);
@@ -248,26 +290,58 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     };
   }, [updateFromApi]);
 
+  const tryPlayUrl = useCallback(async (url: string, useCors: boolean) => {
+    const audio = audioRef.current;
+    if (!audio) throw new Error("no audio");
+
+    if (useCors) {
+      audio.crossOrigin = "anonymous";
+    } else {
+      audio.removeAttribute("crossOrigin");
+    }
+
+    audio.src = url;
+    audio.load();
+    await audio.play();
+  }, []);
+
   const play = useCallback(async () => {
     const audio = audioRef.current;
     if (!audio) return;
     wantPlayRef.current = true;
     setIsLoading(true);
     setError(null);
+
+    const simple = simplePathRef.current;
+    const urls = streamUrls(simple);
+
     try {
-      await ensureGraph();
-      // Prefer same-origin proxy for analyser; fall back to direct stream
-      audio.volume = 1;
-      audio.src = `${PROXY_STREAM}?t=${Date.now()}`;
-      audio.load();
-      await audio.play();
+      if (simple) {
+        // Plain element playback — reliable on Apple WebKit
+        audio.volume = volume;
+        await tryPlayUrl(urls[0]!, false);
+      } else {
+        // Chromium: Web Audio graph for spectrum (user-gesture resume first)
+        await ensureGraph();
+        audio.volume = 1;
+        try {
+          await tryPlayUrl(urls[0]!, true);
+        } catch {
+          audio.removeAttribute("crossOrigin");
+          await tryPlayUrl(urls[1]!, false);
+        }
+        if (ctxRef.current?.state === "suspended") {
+          await ctxRef.current.resume();
+        }
+      }
     } catch (err) {
-      // Fallback: direct Icecast (spectrum may be flat without CORS)
+      // Last resort: other URL
       try {
-        audio.removeAttribute("crossOrigin");
-        audio.src = `${SITE.streamUrl}?t=${Date.now()}`;
-        audio.load();
-        await audio.play();
+        audio.volume = simple ? volume : 1;
+        await tryPlayUrl(urls[1] ?? urls[0]!, false);
+        if (!simple && ctxRef.current?.state === "suspended") {
+          await ctxRef.current.resume();
+        }
       } catch (err2) {
         wantPlayRef.current = false;
         setIsLoading(false);
@@ -283,7 +357,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         void err;
       }
     }
-  }, [ensureGraph]);
+  }, [ensureGraph, tryPlayUrl, volume]);
 
   const pause = useCallback(() => {
     const audio = audioRef.current;
