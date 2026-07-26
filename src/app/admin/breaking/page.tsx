@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import {
-  getBreakingHeadlines,
+  getCmsBreakingHeadlines,
   saveBreakingHeadlines,
 } from "@/services/breaking";
 import { breakingHeadlines as mockHeadlines } from "@/data/mock";
@@ -13,7 +13,7 @@ export default function AdminBreakingPage() {
   const [breakingBusy, setBreakingBusy] = useState(false);
 
   useEffect(() => {
-    void getBreakingHeadlines().then((items) =>
+    void getCmsBreakingHeadlines().then((items) =>
       setBreakingText(items.join("\n")),
     );
   }, []);
@@ -44,7 +44,8 @@ export default function AdminBreakingPage() {
           Breaking News
         </h1>
         <p className="mt-1 text-sm text-fh-muted">
-          Top ticker headlines — එක පේළියකට එකක්.
+          Homepage ticker දැන් නවතම published news 10 ස්වයංක්‍රීයව පෙන්වයි.
+          මෙහි headlines CMS backup / legacy — public site එක ignore කරයි.
         </p>
       </div>
 

@@ -1,24 +1,35 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { breakingHeadlines as mockHeadlines } from "@/data/mock";
-import { getBreakingHeadlines } from "@/services/breaking";
+import { breakingHeadlines as mockHeadlines, latestNews } from "@/data/mock";
+import {
+  getLatestNewsBreakingItems,
+  type BreakingItem,
+} from "@/services/breaking";
 import { SITE } from "@/lib/site";
 
+const mockItems: BreakingItem[] = mockHeadlines.map((title, i) => ({
+  title,
+  href: latestNews[i]?.slug
+    ? `/news/${encodeURIComponent(latestNews[i]!.slug)}`
+    : "#",
+}));
+
 export function TopBar() {
-  const [headlines, setHeadlines] = useState<string[]>(mockHeadlines);
+  const [items, setItems] = useState<BreakingItem[]>(mockItems);
 
   useEffect(() => {
     let cancelled = false;
-    void getBreakingHeadlines().then((items) => {
-      if (!cancelled && items.length > 0) setHeadlines(items);
+    void getLatestNewsBreakingItems().then((headlines) => {
+      if (!cancelled && headlines.length > 0) setItems(headlines);
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const loop = [...headlines, ...headlines];
+  const loop = [...items, ...items];
   const social = [
     { label: "Facebook", href: SITE.social.facebook },
     { label: "YouTube", href: SITE.social.youtube },
@@ -35,9 +46,13 @@ export function TopBar() {
         <div className="relative min-w-0 flex-1 overflow-hidden">
           <div className="animate-ticker flex w-max gap-12 whitespace-nowrap font-sans text-xs md:text-sm">
             {loop.map((item, i) => (
-              <span key={`${item}-${i}`} className="text-neutral-200">
-                {item}
-              </span>
+              <Link
+                key={`${item.href}-${i}`}
+                href={item.href}
+                className="text-neutral-200 transition hover:text-white"
+              >
+                {item.title}
+              </Link>
             ))}
           </div>
         </div>

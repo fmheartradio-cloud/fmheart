@@ -1,5 +1,5 @@
 import { listArticles } from "@/services/articles";
-import { getBreakingHeadlines } from "@/services/breaking";
+import { getLatestNewsBreakingItems } from "@/services/breaking";
 import { getLatestNewsHeroSlides } from "@/services/hero";
 import type { CmsArticle } from "@/types/cms";
 
@@ -27,7 +27,7 @@ export function getGaMeasurementId(): string | null {
 export async function getCmsOverviewStats(): Promise<CmsOverviewStats> {
   const [articles, breaking, hero] = await Promise.all([
     listArticles({ status: "all", limit: 100 }),
-    getBreakingHeadlines(),
+    getLatestNewsBreakingItems(),
     getLatestNewsHeroSlides(),
   ]);
 

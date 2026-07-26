@@ -1,8 +1,16 @@
-import { breakingHeadlines as mockHeadlines } from "@/data/mock";
+import { breakingHeadlines as mockHeadlines, latestNews } from "@/data/mock";
 import { isFirebaseConfigured } from "@/lib/firebase/client";
-import { mapFirebaseError } from "@/services/articles";
+import { listArticles, mapFirebaseError } from "@/services/articles";
+import type { CmsArticle } from "@/types/cms";
+
+const BREAKING_NEWS_LIMIT = 10;
 
 const SETTINGS_DOC = "breaking";
+
+export type BreakingItem = {
+  title: string;
+  href: string;
+};
 
 async function tryFirestore() {
   if (!isFirebaseConfigured()) return null;
@@ -17,8 +25,41 @@ function normalizeHeadlines(raw: unknown): string[] {
     .filter(Boolean);
 }
 
-/** Public read — used by TopBar ticker */
-export async function getBreakingHeadlines(): Promise<string[]> {
+function mockBreakingItems(): BreakingItem[] {
+  return mockHeadlines.map((title, i) => ({
+    title,
+    href: latestNews[i]?.slug
+      ? `/news/${encodeURIComponent(latestNews[i]!.slug)}`
+      : "#",
+  }));
+}
+
+/** Map a published news article to a breaking ticker item. */
+export function cmsToBreakingItem(article: CmsArticle): BreakingItem {
+  return {
+    title: article.title,
+    href: `/news/${encodeURIComponent(article.slug)}`,
+  };
+}
+
+/** Public ticker — 10 newest published news (Sinhala filter via listArticles). */
+export async function getLatestNewsBreakingItems(): Promise<BreakingItem[]> {
+  try {
+    const articles = await listArticles({
+      type: "news",
+      status: "published",
+      limit: BREAKING_NEWS_LIMIT,
+    });
+    if (articles.length === 0) return mockBreakingItems();
+    return articles.map(cmsToBreakingItem);
+  } catch (err) {
+    console.warn("[breaking] latest news read failed:", err);
+    return mockBreakingItems();
+  }
+}
+
+/** Admin CMS read — Firestore settings/breaking (homepage ignores this). */
+export async function getCmsBreakingHeadlines(): Promise<string[]> {
   try {
     const db = await tryFirestore();
     if (!db) return mockHeadlines;
@@ -30,9 +71,15 @@ export async function getBreakingHeadlines(): Promise<string[]> {
     const headlines = normalizeHeadlines(snap.data()?.headlines);
     return headlines.length > 0 ? headlines : mockHeadlines;
   } catch (err) {
-    console.warn("[breaking] read failed:", err);
+    console.warn("[breaking] CMS read failed:", err);
     return mockHeadlines;
   }
+}
+
+/** @deprecated Use getLatestNewsBreakingItems (public) or getCmsBreakingHeadlines (admin). */
+export async function getBreakingHeadlines(): Promise<string[]> {
+  const items = await getLatestNewsBreakingItems();
+  return items.map((item) => item.title);
 }
 
 /** Admin write — requires signed-in admin */
