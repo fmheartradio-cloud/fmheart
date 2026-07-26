@@ -155,7 +155,8 @@ export function RadioProvider({ children }: { children: ReactNode }) {
 
     const audio = new Audio();
     audio.preload = "none";
-    audio.playsInline = true;
+    // iOS Safari: inline playback (also set as attributes for older WebKit)
+    (audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
     audio.setAttribute("playsinline", "true");
     audio.setAttribute("webkit-playsinline", "true");
 
