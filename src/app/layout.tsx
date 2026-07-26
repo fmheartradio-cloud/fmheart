@@ -6,6 +6,7 @@ import {
   Yaldevi,
 } from "next/font/google";
 import { AdSenseScript } from "@/components/seo/AdSenseScript";
+import { GoogleAnalytics } from "@/components/seo/GoogleAnalytics";
 import { OrganizationJsonLd } from "@/components/seo/JsonLd";
 import { Providers } from "@/components/Providers";
 import { SITE } from "@/lib/site";
@@ -126,6 +127,7 @@ export default function RootLayout({
       <body className="min-h-full bg-white font-sans text-fh-ink antialiased">
         <OrganizationJsonLd />
         <AdSenseScript />
+        <GoogleAnalytics />
         <Providers>{children}</Providers>
       </body>
     </html>

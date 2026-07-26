@@ -288,32 +288,39 @@ export async function saveArticle(
     status: input.status,
     tags: input.tags.filter(Boolean),
     readingTimeMin: readingTime(input.body),
-    views: 0,
     seoTitle: input.seoTitle?.trim() || input.title.trim(),
     seoDescription: input.seoDescription?.trim() || input.excerpt.trim(),
     updatedAt: nowIso,
     publishedAt: input.status === "published" ? nowIso : null,
-    createdAt: nowIso,
   };
 
   try {
     if (id) {
       const ref = doc(db, "articles", id);
       await withTimeout(
-        setDoc(ref, { ...payload, updatedAt: nowIso }, { merge: true }),
+        setDoc(ref, payload, { merge: true }),
         15000,
         "Firestore save",
       );
-      return { id, ...payload } as CmsArticle;
+      return { id, views: 0, createdAt: nowIso, ...payload } as CmsArticle;
     }
 
     const ref = await withTimeout(
-      addDoc(collection(db, "articles"), payload),
+      addDoc(collection(db, "articles"), {
+        ...payload,
+        views: 0,
+        createdAt: nowIso,
+      }),
       15000,
       "Firestore save",
     );
 
-    return { id: ref.id, ...payload } as CmsArticle;
+    return {
+      id: ref.id,
+      views: 0,
+      createdAt: nowIso,
+      ...payload,
+    } as CmsArticle;
   } catch (err) {
     throw new Error(mapFirebaseError(err));
   }
@@ -347,6 +354,25 @@ export function cmsToCard(article: CmsArticle) {
     slug: article.slug,
     href: path,
   };
+}
+
+/** Public view counter — once per article per browser session */
+export async function incrementArticleViews(id: string): Promise<void> {
+  if (!id || !isFirebaseConfigured()) return;
+  if (typeof window !== "undefined") {
+    const key = `fh-view-${id}`;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, "1");
+  }
+
+  try {
+    const db = await tryFirestore();
+    if (!db) return;
+    const { doc, increment, updateDoc } = await import("firebase/firestore");
+    await updateDoc(doc(db, "articles", id), { views: increment(1) });
+  } catch (err) {
+    console.warn("[articles] view increment failed:", err);
+  }
 }
 
 export { slugify };

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArticleViewTracker } from "@/components/analytics/ArticleViewTracker";
 import { AdSenseUnit } from "@/components/ads/AdSenseUnit";
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
@@ -57,6 +58,7 @@ export default async function GossipArticlePage({ params }: Props) {
       />
       <TopBar />
       <Header />
+      <ArticleViewTracker articleId={article.id} />
       <main className="mx-auto max-w-3xl px-3 py-8 md:px-4">
         <nav className="mb-4 text-xs text-fh-muted">
           <Link href="/" className="hover:text-fh-red">

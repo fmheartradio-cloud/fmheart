@@ -21,32 +21,32 @@ async function tryFirestore() {
 
 function normalizeSlides(raw: unknown): Article[] {
   if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item, i) => {
-      if (!item || typeof item !== "object") return null;
-      const row = item as Record<string, unknown>;
-      const title = typeof row.title === "string" ? row.title.trim() : "";
-      const image = typeof row.image === "string" ? row.image.trim() : "";
-      const slug = typeof row.slug === "string" ? row.slug.trim() : "";
-      const category =
-        typeof row.category === "string" ? row.category.trim() : "News";
-      if (!title || !image || !slug) return null;
-      const excerpt =
-        typeof row.excerpt === "string" ? row.excerpt.trim() : undefined;
-      return {
-        id: typeof row.id === "string" && row.id ? row.id : `hero-${i + 1}`,
-        title,
-        excerpt: excerpt || undefined,
-        category: category || "News",
-        image,
-        slug,
-        publishedAt:
-          typeof row.publishedAt === "string" && row.publishedAt
-            ? row.publishedAt
-            : "දැන්",
-      } satisfies Article;
-    })
-    .filter((s): s is Article => Boolean(s));
+  const out: Article[] = [];
+  raw.forEach((item, i) => {
+    if (!item || typeof item !== "object") return;
+    const row = item as Record<string, unknown>;
+    const title = typeof row.title === "string" ? row.title.trim() : "";
+    const image = typeof row.image === "string" ? row.image.trim() : "";
+    const slug = typeof row.slug === "string" ? row.slug.trim() : "";
+    const category =
+      typeof row.category === "string" ? row.category.trim() : "News";
+    if (!title || !image || !slug) return;
+    const excerpt =
+      typeof row.excerpt === "string" ? row.excerpt.trim() : undefined;
+    out.push({
+      id: typeof row.id === "string" && row.id ? row.id : `hero-${i + 1}`,
+      title,
+      excerpt: excerpt || undefined,
+      category: category || "News",
+      image,
+      slug,
+      publishedAt:
+        typeof row.publishedAt === "string" && row.publishedAt
+          ? row.publishedAt
+          : "දැන්",
+    });
+  });
+  return out;
 }
 
 /** Public read — used by homepage HeroSlider */
