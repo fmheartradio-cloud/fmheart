@@ -69,7 +69,7 @@ export function Header() {
 
           <button
             type="button"
-            className="hidden h-10 w-10 items-center justify-center rounded-md border border-neutral-200 text-fh-ink transition hover:bg-fh-surface md:inline-flex"
+            className="hidden h-10 w-10 -translate-x-0.5 items-center justify-center rounded-md border border-neutral-200 text-fh-ink transition hover:bg-fh-surface md:inline-flex"
             aria-label="Search"
             onClick={() => setSearchOpen((v) => !v)}
           >
