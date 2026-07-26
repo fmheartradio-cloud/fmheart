@@ -18,7 +18,12 @@ import {
   saveArticle,
   slugify,
 } from "@/services/articles";
+import {
+  getBreakingHeadlines,
+  saveBreakingHeadlines,
+} from "@/services/breaking";
 import type { CmsArticle, CmsArticleInput, ContentType } from "@/types/cms";
+import { breakingHeadlines as mockHeadlines } from "@/data/mock";
 
 const emptyForm: CmsArticleInput = {
   type: "news",
@@ -45,6 +50,9 @@ export default function AdminCmsPage() {
   const [busy, setBusy] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [denied, setDenied] = useState(false);
+  const [breakingText, setBreakingText] = useState(mockHeadlines.join("\n"));
+  const [breakingMsg, setBreakingMsg] = useState<string | null>(null);
+  const [breakingBusy, setBreakingBusy] = useState(false);
 
   useEffect(() => {
     if (!configured) return;
@@ -67,8 +75,31 @@ export default function AdminCmsPage() {
   }, [user]);
 
   async function refresh() {
-    const items = await listArticles({ status: "all", limit: 50 });
+    const [items, breaking] = await Promise.all([
+      listArticles({ status: "all", limit: 50 }),
+      getBreakingHeadlines(),
+    ]);
     setArticles(items);
+    setBreakingText(breaking.join("\n"));
+  }
+
+  async function handleSaveBreaking(e: FormEvent) {
+    e.preventDefault();
+    setBreakingBusy(true);
+    setBreakingMsg(null);
+    try {
+      const lines = breakingText
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
+      const saved = await saveBreakingHeadlines(lines);
+      setBreakingText(saved.join("\n"));
+      setBreakingMsg("Breaking news updated ✓");
+    } catch (err) {
+      setBreakingMsg(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setBreakingBusy(false);
+    }
   }
 
   async function handleLogin(e: FormEvent) {
@@ -283,6 +314,36 @@ export default function AdminCmsPage() {
       </header>
 
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-8 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="space-y-8">
+          <form
+            onSubmit={handleSaveBreaking}
+            className="space-y-3 bg-white p-5 shadow-sm"
+          >
+            <h2 className="font-heading text-lg font-bold">Breaking News</h2>
+            <p className="text-xs text-fh-muted">
+              Top ticker headlines — එක පේළියකට එකක්. Save කළාම site එකේ
+              BREAKING bar එක update වෙයි.
+            </p>
+            <textarea
+              required
+              rows={5}
+              value={breakingText}
+              onChange={(e) => setBreakingText(e.target.value)}
+              placeholder={"Headline 1\nHeadline 2\nHeadline 3"}
+              className="w-full border border-neutral-300 px-3 py-2 font-sans text-sm"
+            />
+            <button
+              type="submit"
+              disabled={breakingBusy}
+              className="bg-fh-red px-5 py-2.5 font-heading text-sm font-bold text-white disabled:opacity-60"
+            >
+              {breakingBusy ? "Saving…" : "Save Breaking News"}
+            </button>
+            {breakingMsg && (
+              <p className="text-sm text-fh-muted">{breakingMsg}</p>
+            )}
+          </form>
+
         <form onSubmit={handleSave} className="space-y-3 bg-white p-5 shadow-sm">
           <h2 className="font-heading text-lg font-bold">
             {editingId ? "Edit Article" : "New Article"}
@@ -403,6 +464,7 @@ export default function AdminCmsPage() {
           </div>
           {message && <p className="text-sm text-fh-muted">{message}</p>}
         </form>
+        </div>
 
         <div className="bg-white p-5 shadow-sm">
           <h2 className="font-heading text-lg font-bold">

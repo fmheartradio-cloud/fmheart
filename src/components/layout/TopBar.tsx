@@ -1,10 +1,24 @@
 "use client";
 
-import { breakingHeadlines } from "@/data/mock";
+import { useEffect, useState } from "react";
+import { breakingHeadlines as mockHeadlines } from "@/data/mock";
+import { getBreakingHeadlines } from "@/services/breaking";
 import { SITE } from "@/lib/site";
 
 export function TopBar() {
-  const loop = [...breakingHeadlines, ...breakingHeadlines];
+  const [headlines, setHeadlines] = useState<string[]>(mockHeadlines);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getBreakingHeadlines().then((items) => {
+      if (!cancelled && items.length > 0) setHeadlines(items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const loop = [...headlines, ...headlines];
   const social = [
     { label: "Facebook", href: SITE.social.facebook },
     { label: "YouTube", href: SITE.social.youtube },
