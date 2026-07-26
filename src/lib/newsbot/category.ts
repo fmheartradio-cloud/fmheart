@@ -21,6 +21,8 @@ const URL_SEGMENT_TO_CATEGORY: Record<string, FmHeartNewsCategory> = {
   sport: "ක්‍රීඩා",
   cricket: "ක්‍රීඩා",
   football: "ක්‍රීඩා",
+  "local-news": "දේශීය",
+  local: "දේශීය",
   international: "ලෝක පුවත්",
   world: "ලෝක පුවත්",
   global: "ලෝක පුවත්",
@@ -135,7 +137,12 @@ function categoryFromUrl(sourceUrl: string): FmHeartNewsCategory | null {
       .map((s) => decodeURIComponent(s).trim().toLowerCase())
       .filter(Boolean);
     for (const segment of segments) {
-      if (segment === "uncategorized" || segment === "news" || /^\d+$/.test(segment)) {
+      if (
+        segment === "uncategorized" ||
+        segment === "news" ||
+        segment === "breaking-news" ||
+        /^\d+$/.test(segment)
+      ) {
         continue;
       }
       const mapped = URL_SEGMENT_TO_CATEGORY[segment];

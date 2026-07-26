@@ -2,16 +2,34 @@
 
 ## Flow
 
-RSS → duplicate check → Firestore **draft** → Admin **Publish** at `/admin/articles`
+RSS / list page → duplicate check → Firestore **draft** → Admin **Publish** at `/admin/articles`
 
 Two runners (same drafts):
 
-1. **Vercel Cron** (preferred on this stack) → `GET/POST /api/cron/newsbot`
-2. **Python** under `services/newsbot/` (local / optional GitHub Actions)
+1. **GitHub Actions** every **10 minutes** → `POST https://fmheart-tau.vercel.app/api/cron/newsbot` (preferred)
+2. **Vercel Cron** daily backup → same endpoint (`vercel.json`, `0 3 * * *`)
+
+Primary ingest logic lives in Next.js: `src/lib/newsbot/ingest.ts`.
+
+Optional local Python runner under `services/newsbot/` mirrors sources in `sources.yaml`.
 
 ---
 
-## YOU must do (one-time) — I cannot do this for you
+## Sinhala sources (5)
+
+| Source | Feed / list |
+|--------|-------------|
+| Neth News | `https://www.nethnews.lk/feed/` |
+| News First Sinhala | `https://sinhala.newsfirst.lk/` (homepage list scrape) |
+| Ada Derana Sinhala | `https://sinhala.adaderana.lk/rsshotnews.php` |
+| BBC Sinhala | `https://feeds.bbci.co.uk/sinhala/rss.xml` |
+| Lanka eNews | `https://www.lankaenews.com/` → `/news/{id}/si` |
+
+Categories are inferred per article (URL path, RSS tags, keywords) — not a single blanket default.
+
+---
+
+## YOU must do (one-time)
 
 ### A) Firebase service account
 1. Firebase Console → project settings → Service accounts → **Generate new private key**
@@ -28,25 +46,28 @@ Project → Settings → Environment Variables (Production + Preview):
 
 Redeploy after saving.
 
-### C) Manual test after deploy
-```powershell
-curl -X POST "https://fmheart-tau.vercel.app/api/cron/newsbot" -H "Authorization: Bearer YOUR_CRON_SECRET"
-```
+### C) GitHub Actions secret (10‑min schedule)
 
-Then open `/admin/articles` → Drafts → Publish.
+Repository → Settings → Secrets and variables → Actions:
 
----
+| Name | Value |
+|------|--------|
+| `CRON_SECRET` | Same value as Vercel `CRON_SECRET` |
 
-## Optional: GitHub Actions every 10 min
-
-Local commit may exist for `.github/workflows/newsbot.yml`. Push needs `workflow` scope:
+If pushing `.github/workflows/newsbot.yml` fails, refresh workflow scope:
 
 ```powershell
 gh auth refresh -h github.com -s workflow
 git push
 ```
 
-Secret: `FIREBASE_SERVICE_ACCOUNT_JSON`
+### D) Manual test after deploy
+
+```powershell
+node scripts/run-newsbot-local.mjs .env.local
+```
+
+Then open `/admin/articles` → Drafts → Publish.
 
 ---
 
@@ -65,5 +86,7 @@ python main.py
 ## Notes
 
 - Drafts only (copyright/quality).
-- RSS only in this phase (no HTML scrape).
-- Vercel Hobby may limit cron frequency; if 15‑min does not fire often enough, use GitHub Actions after granting `workflow` scope.
+- Sinhala-only filter on ingest.
+- Full article body + cover image scraped when RSS teaser is short.
+- Source attribution lines (e.g. `(ලංකා ඊ නිව්ස් …)`) stripped from body; `source` / `sourceUrl` fields keep provenance.
+- Vercel Hobby limits cron to daily; GitHub Actions handles ~10‑minute polling.

@@ -1,20 +1,30 @@
-# RSS-only Phase 1. Prefer official feeds; no HTML scrape.
+# RSS or list-page sources for Sinhala news (Phase 1).
 # Disable a source with active: false
 sources:
-  - id: ada-lk
-    name: Ada
-    rss: https://www.ada.lk/rss/latest_news/1
+  - id: nethnews
+    name: Neth News
+    rss: https://www.nethnews.lk/feed/
     category: දේශීය
     active: true
-  - id: adaderana
-    name: Ada Derana
-    rss: https://www.adaderana.lk/rss.php
+  - id: newsfirst-sinhala
+    name: News First Sinhala
+    list_url: https://sinhala.newsfirst.lk/
+    category: දේශීය
+    active: true
+  - id: adaderana-sinhala
+    name: Ada Derana Sinhala
+    rss: https://sinhala.adaderana.lk/rsshotnews.php
     category: දේශීය
     active: true
   - id: bbc-sinhala
     name: BBC Sinhala
     rss: https://feeds.bbci.co.uk/sinhala/rss.xml
     category: ජාත්‍යන්තර
+    active: true
+  - id: lankaenews
+    name: Lanka eNews
+    list_url: https://www.lankaenews.com/
+    category: දේශීය
     active: true
 
 # Bot writes drafts for admin review (safer for copyright/quality)

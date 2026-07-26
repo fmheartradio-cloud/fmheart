@@ -48,8 +48,12 @@ def main() -> int:
     for src in sources:
         name = src.get("name") or src.get("id") or "Source"
         rss = src.get("rss")
+        list_url = src.get("list_url")
         if not rss:
-            print(f"[skip] {name}: no rss url")
+            if list_url:
+                print(f"[skip] {name}: list_url sources use the Vercel/Next.js runner")
+            else:
+                print(f"[skip] {name}: no rss url")
             continue
         print(f"[fetch] {name} ← {rss}")
         try:

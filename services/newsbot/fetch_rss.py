@@ -229,6 +229,50 @@ def extract_article_body_from_html(html: str, page_url: str) -> str:
             text = _html_fragment_to_paragraphs(match.group(1))
             if len(text) >= MIN_BODY_CHARS:
                 return cap_body(text)
+        for match in re.finditer(
+            r'<div[^>]+class=["\'][^"\']*\bnews-content\b[^"\']*["\'][^>]*>(.*?)</div>',
+            html,
+            re.I | re.S,
+        ):
+            text = _html_fragment_to_paragraphs(match.group(1))
+            if len(text) >= MIN_BODY_CHARS:
+                return cap_body(text)
+
+    if "nethnews.lk" in host:
+        wrap = re.search(
+            r'<div[^>]+class=["\'][^"\']*\barticle-content-wrap\b[^"\']*["\'][^>]*>(.*?)(?:<div[^>]+class=["\'][^"\']*(?:related|comment|sidebar|social)\b|<section[^>]+class=["\'][^"\']*(?:related|comment)\b)',
+            html,
+            re.I | re.S,
+        )
+        if wrap:
+            text = _html_fragment_to_paragraphs(wrap.group(1))
+            if len(text) >= MIN_BODY_CHARS:
+                return cap_body(text)
+
+    if "newsfirst.lk" in host:
+        details = re.search(
+            r'<div[^>]+class=["\'][^"\']*\bnew_details\b[^"\']*["\'][^>]*>(.*?)(?:<div[^>]+class=["\'][^"\']*(?:related|comment|sidebar|footer)\b|<footer[\s>])',
+            html,
+            re.I | re.S,
+        )
+        if details:
+            text = _html_fragment_to_paragraphs(details.group(1))
+            if len(text) >= MIN_BODY_CHARS:
+                return cap_body(text)
+
+    if "lankaenews.com" in host:
+        paragraphs = []
+        for match in re.finditer(r"(?is)<p[^>]*>(.*?)</p>", html):
+            text = _strip_inline_html(match.group(1))
+            if (
+                len(text) >= 40
+                and re.search(r"[\u0D80-\u0DFF]", text)
+                and not re.match(r"^(?:මූලාශ්‍ර|මුලාශ්‍ර|Source\s*:)", text, re.I)
+            ):
+                paragraphs.append(text)
+        joined = "\n\n".join(paragraphs)
+        if len(joined) >= MIN_BODY_CHARS:
+            return cap_body(joined)
 
     if "bbc.com" in host or "bbc.co.uk" in host:
         paragraphs = []

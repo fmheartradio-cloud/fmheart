@@ -24,6 +24,8 @@ URL_SEGMENT_TO_CATEGORY = {
     "sport": "ක්‍රීඩා",
     "cricket": "ක්‍රීඩා",
     "football": "ක්‍රීඩා",
+    "local-news": "දේශීය",
+    "local": "දේශීය",
     "international": "ලෝක පුවත්",
     "world": "ලෝක පුවත්",
     "global": "ලෝක පුවත්",
@@ -157,7 +159,7 @@ def _category_from_url(source_url: str) -> str | None:
     except Exception:
         return None
     for segment in segments:
-        if segment in {"uncategorized", "news"} or segment.isdigit():
+        if segment in {"uncategorized", "news", "breaking-news"} or segment.isdigit():
             continue
         mapped = URL_SEGMENT_TO_CATEGORY.get(segment)
         if mapped:

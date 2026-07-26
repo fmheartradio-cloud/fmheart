@@ -14,23 +14,33 @@ import { hasSinhalaNewsText } from "@/lib/sinhala-script";
 export type NewsSource = {
   id: string;
   name: string;
-  rss: string;
+  /** Official RSS/Atom feed when available. */
+  rss?: string;
+  /** Homepage or section URL to scrape recent article links when RSS is unavailable. */
+  listUrl?: string;
   category: string;
   active?: boolean;
 };
 
 export const DEFAULT_NEWS_SOURCES: NewsSource[] = [
   {
-    id: "ada-lk",
-    name: "Ada",
-    rss: "https://www.ada.lk/rss/latest_news/1",
+    id: "nethnews",
+    name: "Neth News",
+    rss: "https://www.nethnews.lk/feed/",
     category: "දේශීය",
     active: true,
   },
   {
-    id: "adaderana",
-    name: "Ada Derana",
-    rss: "https://www.adaderana.lk/rss.php",
+    id: "newsfirst-sinhala",
+    name: "News First Sinhala",
+    listUrl: "https://sinhala.newsfirst.lk/",
+    category: "දේශීය",
+    active: true,
+  },
+  {
+    id: "adaderana-sinhala",
+    name: "Ada Derana Sinhala",
+    rss: "https://sinhala.adaderana.lk/rsshotnews.php",
     category: "දේශීය",
     active: true,
   },
@@ -39,6 +49,13 @@ export const DEFAULT_NEWS_SOURCES: NewsSource[] = [
     name: "BBC Sinhala",
     rss: "https://feeds.bbci.co.uk/sinhala/rss.xml",
     category: "ජාත්‍යන්තර",
+    active: true,
+  },
+  {
+    id: "lankaenews",
+    name: "Lanka eNews",
+    listUrl: "https://www.lankaenews.com/",
+    category: "දේශීය",
     active: true,
   },
 ];
@@ -261,11 +278,22 @@ function isBodyTooShort(body: string, title: string): boolean {
 }
 
 function capBody(text: string): string {
-  const trimmed = text.trim();
+  const trimmed = stripSourceAttribution(text);
   if (trimmed.length <= MAX_BODY_CHARS) return trimmed;
   const slice = trimmed.slice(0, MAX_BODY_CHARS);
   const lastBreak = slice.lastIndexOf("\n\n");
   return (lastBreak > MAX_BODY_CHARS * 0.6 ? slice.slice(0, lastBreak) : slice).trim();
+}
+
+/** Remove in-body source attribution; source/sourceUrl fields store provenance. */
+function stripSourceAttribution(body: string): string {
+  let text = body.trim();
+  text = text.replace(
+    /^\([\s\S]*?(?:ලංකා\s*ඊ\s*නිව්ස්|Lanka\s*e\s*News|LEN)[\s\S]*?\)\s*/iu,
+    "",
+  );
+  text = text.replace(/\n*(?:මූලාශ්‍ර|මුලාශ්‍ර|Source\s*:)[^\n]*/giu, "");
+  return text.trim();
 }
 
 function stripInlineHtml(raw: string): string {
@@ -339,6 +367,24 @@ function extractMetaDescription(html: string): string {
     const match = html.match(pattern);
     if (match?.[1]) {
       return stripInlineHtml(match[1]);
+    }
+  }
+  return "";
+}
+
+function extractTitleFromHtml(html: string): string {
+  const patterns = [
+    /property=["']og:title["'][^>]*content=["']([^"']+)["']/i,
+    /content=["']([^"']+)["'][^>]*property=["']og:title["']/i,
+    /<h1[^>]*>([\s\S]*?)<\/h1>/i,
+  ];
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) {
+      const title = stripInlineHtml(match[1])
+        .replace(/\s*[|\-–—]\s*.*$/, "")
+        .trim();
+      if (title.length >= 4) return title;
     }
   }
   return "";
@@ -432,6 +478,50 @@ function extractArticleBodyFromHtml(html: string, pageUrl: string): string {
     }
   }
 
+  if (host.includes("nethnews.lk")) {
+    const wrap = extractContainerFragment(
+      html,
+      /<div[^>]+class=["'][^"']*\barticle-content-wrap\b[^"']*["'][^>]*>/i,
+      [
+        /<div[^>]+class=["'][^"']*\b(related|comment|sidebar|social)\b/i,
+        /<section[^>]+class=["'][^"']*\b(related|comment)\b/i,
+      ],
+    );
+    if (wrap) {
+      const text = htmlFragmentToParagraphs(wrap);
+      if (text.length >= MIN_BODY_CHARS) return capBody(text);
+    }
+  }
+
+  if (host.includes("newsfirst.lk")) {
+    const details = extractContainerFragment(
+      html,
+      /<div[^>]+class=["'][^"']*\bnew_details\b[^"']*["'][^>]*>/i,
+      [
+        /<div[^>]+class=["'][^"']*\b(related|comment|sidebar|footer)\b/i,
+        /<footer[\s>]/i,
+      ],
+    );
+    if (details) {
+      const text = htmlFragmentToParagraphs(details);
+      if (text.length >= MIN_BODY_CHARS) return capBody(text);
+    }
+  }
+
+  if (host.includes("lankaenews.com")) {
+    const paragraphs = [...html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+      .map((m) => stripInlineHtml(m[1]))
+      .filter(
+        (t) =>
+          t.length >= 40 &&
+          /[\u0D80-\u0DFF]/.test(t) &&
+          !/^(?:මූලාශ්‍ර|මුලාශ්‍ර|Source\s*:)/i.test(t) &&
+          !/^\([\s\S]*?(?:ලංකා\s*ඊ\s*නිව්ස්|LEN)/i.test(t),
+      );
+    const joined = paragraphs.join("\n\n");
+    if (joined.length >= MIN_BODY_CHARS) return capBody(joined);
+  }
+
   if (host.includes("bbc.com") || host.includes("bbc.co.uk")) {
     const paragraphs = [...html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
       .map((m) => stripInlineHtml(m[1]))
@@ -475,6 +565,7 @@ type ArticlePageData = {
   /** og:image / twitter card URL — often a branded share card on Ada.lk. */
   ogCoverImage: string;
   body: string;
+  title: string;
   fetched: boolean;
 };
 
@@ -597,7 +688,8 @@ async function fetchArticlePageData(sourceUrl: string): Promise<ArticlePageData 
       const ogCoverImage = extractOgImageFromHtml(html, pageUrl);
       const coverImage = extractImageFromPageHtml(html, pageUrl, ogCoverImage);
       const body = extractArticleBodyFromHtml(html, pageUrl);
-      return { coverImage, ogCoverImage, body, fetched: true };
+      const title = extractTitleFromHtml(html);
+      return { coverImage, ogCoverImage, body, title, fetched: true };
     } catch {
       /* retry once */
     }
@@ -690,6 +782,109 @@ function parseRssItems(xml: string, limit: number): FeedItem[] {
     });
   }
   return items;
+}
+
+function parseNewsFirstList(html: string, limit: number): FeedItem[] {
+  const base = "https://sinhala.newsfirst.lk";
+  const seen = new Set<string>();
+  const items: FeedItem[] = [];
+  for (const match of html.matchAll(/href=["'](\/\d{4}\/\d{2}\/\d{2}\/[^"'#?]+)["']/gi)) {
+    const path = match[1];
+    if (seen.has(path)) continue;
+    seen.add(path);
+    items.push({
+      title: "",
+      sourceUrl: `${base}${path}`,
+      excerpt: "",
+      body: "",
+      coverImage: "",
+      rssCategories: [],
+    });
+    if (items.length >= limit) break;
+  }
+  return items;
+}
+
+function parseLankaENewsList(html: string, limit: number): FeedItem[] {
+  const seen = new Set<string>();
+  const items: FeedItem[] = [];
+  for (const match of html.matchAll(/href=["']\/news\/(\d+)\/en["']/gi)) {
+    const id = match[1];
+    if (seen.has(id)) continue;
+    seen.add(id);
+    items.push({
+      title: "",
+      sourceUrl: `https://www.lankaenews.com/news/${id}/si`,
+      excerpt: "",
+      body: "",
+      coverImage: "",
+      rssCategories: [],
+    });
+    if (items.length >= limit) break;
+  }
+  return items;
+}
+
+async function enrichFeedItemFromPage(item: FeedItem): Promise<FeedItem> {
+  if (!item.sourceUrl) return item;
+  const needsTitle = !item.title.trim();
+  const needsCover = !item.coverImage;
+  const needsBody = isBodyTooShort(item.body, item.title || item.sourceUrl);
+  if (!needsTitle && !needsCover && !needsBody) return item;
+
+  const pageData = await fetchArticlePageData(item.sourceUrl);
+  if (!pageData) return item;
+
+  const title = item.title.trim() || pageData.title.trim();
+  return {
+    ...item,
+    title,
+    pageFetched: pageData.fetched,
+    coverImage: resolveCoverImage(
+      item.coverImage,
+      pageData.coverImage,
+      pageData.ogCoverImage,
+      item.sourceUrl,
+    ),
+    excerpt: item.excerpt || pageData.body.slice(0, 400) || title,
+    body:
+      needsBody && pageData.body && !bodyLooksLikeTitle(pageData.body, title)
+        ? pageData.body
+        : item.body,
+  };
+}
+
+async function fetchListPage(src: NewsSource, limit: number): Promise<FeedItem[]> {
+  const listUrl = src.listUrl?.trim();
+  if (!listUrl) return [];
+
+  const res = await fetch(listUrl, {
+    headers: {
+      "User-Agent": NEWSBOT_USER_AGENT,
+      Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
+    },
+    cache: "no-store",
+    signal: AbortSignal.timeout(25000),
+  });
+  if (!res.ok) throw new Error(`List ${res.status} for ${listUrl}`);
+  const html = await res.text();
+
+  let stubs: FeedItem[] = [];
+  if (src.id === "newsfirst-sinhala") {
+    stubs = parseNewsFirstList(html, limit);
+  } else if (src.id === "lankaenews") {
+    stubs = parseLankaENewsList(html, limit);
+  } else {
+    throw new Error(`No list parser for ${src.id}`);
+  }
+
+  return mapWithConcurrency(stubs, 3, enrichFeedItemFromPage);
+}
+
+async function fetchSourceItems(src: NewsSource, limit: number): Promise<FeedItem[]> {
+  if (src.rss) return fetchRss(src.rss, limit);
+  if (src.listUrl) return fetchListPage(src, limit);
+  throw new Error(`Source ${src.id} has no rss or listUrl`);
 }
 
 async function fetchRss(url: string, limit: number): Promise<FeedItem[]> {
@@ -791,11 +986,15 @@ export async function runNewsIngest(options?: {
       categoriesUpdated: 0,
     };
     try {
-      const items = await fetchRss(src.rss, maxPerSource);
+      const items = await fetchSourceItems(src, maxPerSource);
       row.fetched = items.length;
 
       for (const item of items) {
         const title = item.title.trim();
+        if (!title) {
+          row.skipped += 1;
+          continue;
+        }
         if (!hasSinhalaNewsText(title, item.excerpt)) {
           row.skipped += 1;
           continue;
