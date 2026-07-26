@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64" role="img" aria-label="FM Heart">
+  <defs>
+    <linearGradient id="h" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF1744"/>
+      <stop offset="100%" stop-color="#D50000"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#h)" d="M28 54C28 54 6 38 6 22.5C6 15.2 11.5 10 18.2 10C22.5 10 26.2 12.4 28.5 16.2C30.8 12.4 34.5 10 38.8 10C45.5 10 51 15.2 51 22.5C51 38 28 54 28 54Z"/>
+  <path fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M14 28 H20 L23 23 L27 35 L31 20 L34 28 H42"/>
+  <text x="62" y="30" font-family="Arial Black, Arial, sans-serif" font-size="22" font-weight="900" letter-spacing="1" fill="#111">FM</text>
+  <text x="102" y="30" font-family="Arial Black, Arial, sans-serif" font-size="22" font-weight="900" letter-spacing="1" fill="#D50000">HEART</text>
+  <text x="62" y="48" font-family="Arial, sans-serif" font-size="9" letter-spacing="1.5" fill="#666">THE RHYTHM OF YOUTH HEART BEAT</text>
+</svg>
