@@ -112,7 +112,7 @@ def title_too_similar(db, title: str, threshold: float = 0.9) -> bool:
 
 def save_draft(item: dict[str, Any]) -> str | None:
     """Insert article as draft. Returns doc id or None if skipped."""
-    from fetch_rss import fetch_og_image
+    from fetch_rss import ADMIN_BODY_MIN_CHARS, is_body_too_short
     from sinhala_script import has_sinhala_news_text
 
     db = get_db()
@@ -127,29 +127,54 @@ def save_draft(item: dict[str, Any]) -> str | None:
 
     h = source_hash(url, title)
     existing_id, existing = find_existing_by_hash(db, h)
-    if existing_id:
+    if existing_id and existing:
         existing_cover = (existing.get("coverImage") or "").strip()
-        if not existing_cover:
+        existing_body = (existing.get("body") or "").strip()
+        needs_cover = not existing_cover
+        needs_body = (
+            len(existing_body) < ADMIN_BODY_MIN_CHARS
+            and is_body_too_short(existing_body, title)
+        )
+        updates: dict[str, Any] = {}
+        page_data = None
+        if url and (needs_cover or needs_body):
+            from fetch_rss import fetch_article_page_data
+
+            page_data = fetch_article_page_data(url)
+        if needs_cover:
             cover = (item.get("coverImage") or "").strip()
-            if not cover and url:
-                cover = fetch_og_image(url)
+            if not cover and page_data:
+                cover = (page_data.get("coverImage") or "").strip()
             if cover:
-                now = datetime.now(tz=timezone.utc).isoformat()
-                db.collection("articles").document(existing_id).update(
-                    {"coverImage": cover, "updatedAt": now}
-                )
-                return existing_id
+                updates["coverImage"] = cover
+        if needs_body:
+            fuller_body = (item.get("body") or "").strip()
+            if is_body_too_short(fuller_body, title) and page_data:
+                fuller_body = (page_data.get("body") or fuller_body).strip()
+            if (
+                fuller_body
+                and len(fuller_body) > len(existing_body)
+                and not is_body_too_short(fuller_body, title)
+            ):
+                from fetch_rss import cap_body, _reading_time
+
+                updates["body"] = cap_body(fuller_body)
+                updates["readingTimeMin"] = _reading_time(updates["body"])
+        if updates:
+            now = datetime.now(tz=timezone.utc).isoformat()
+            updates["updatedAt"] = now
+            db.collection("articles").document(existing_id).update(updates)
+            return existing_id
         return None
     if title_too_similar(db, title):
         return None
 
     now = datetime.now(tz=timezone.utc).isoformat()
     excerpt = (item.get("excerpt") or title)[:400]
-    body = (item.get("body") or excerpt).strip()
+    from fetch_rss import cap_body
+
+    body = cap_body((item.get("body") or excerpt).strip())
     source_name = item.get("source") or "Unknown"
-    # Attribution footer — do not republish full third-party text as original
-    if url and "මූලාශ්‍ර" not in body:
-        body = f"{body}\n\n—\nමූලාශ්‍ර: {source_name}\n{url}"
 
     status = item.get("status") or "draft"
     payload = {

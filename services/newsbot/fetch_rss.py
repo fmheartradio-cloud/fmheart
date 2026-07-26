@@ -13,6 +13,9 @@ import requests
 
 UA = "FMHeartNewsBot/1.0 (+https://fmheart.lk; news aggregation drafts)"
 _IMAGE_EXT = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif")
+MIN_BODY_CHARS = 280
+MAX_BODY_CHARS = 10000
+ADMIN_BODY_MIN_CHARS = 500
 
 
 def _strip_html(raw: str) -> str:
@@ -94,11 +97,178 @@ def _first_image(entry: Any, feed_base: str = "") -> str:
     return ""
 
 
-def fetch_og_image(source_url: str) -> str:
-    if not source_url:
+def _normalize_body_text(raw: str) -> str:
+    return re.sub(r"\s+", " ", (raw or "").strip())
+
+
+def _jaccard(a: str, b: str) -> float:
+    a_set = set(a.split())
+    b_set = set(b.split())
+    if not a_set or not b_set:
+        return 0.0
+    inter = len(a_set & b_set)
+    return inter / (len(a_set) + len(b_set) - inter)
+
+
+def is_body_too_short(body: str, title: str) -> bool:
+    text = _normalize_body_text(body)
+    if len(text) < MIN_BODY_CHARS:
+        return True
+    title_norm = _normalize_body_text(title).lower()
+    body_norm = text.lower()
+    if body_norm == title_norm:
+        return True
+    if (
+        len(title_norm) > 20
+        and body_norm.startswith(title_norm)
+        and len(text) < len(title_norm) + 80
+    ):
+        return True
+    return _jaccard(body_norm, title_norm) >= 0.88
+
+
+def cap_body(text: str) -> str:
+    trimmed = (text or "").strip()
+    if len(trimmed) <= MAX_BODY_CHARS:
+        return trimmed
+    slice_ = trimmed[:MAX_BODY_CHARS]
+    last_break = slice_.rfind("\n\n")
+    if last_break > MAX_BODY_CHARS * 0.6:
+        return slice_[:last_break].strip()
+    return slice_.strip()
+
+
+def _strip_inline_html(raw: str) -> str:
+    text = unescape(raw or "")
+    text = re.sub(r"(?i)<br\s*/?>", "\n", text)
+    text = re.sub(r"(?i)</p>", "\n", text)
+    text = re.sub(r"(?s)<[^>]+>", " ", text)
+    text = text.replace("\u200c", " ").replace("\u200d", " ").replace("\xa0", " ")
+    text = re.sub(r"[ \t]+\n", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return text.strip()
+
+
+def _html_fragment_to_paragraphs(fragment: str) -> str:
+    html = fragment or ""
+    html = re.sub(r"(?is)<script[^>]*>.*?</script>", " ", html)
+    html = re.sub(r"(?is)<style[^>]*>.*?</style>", " ", html)
+    html = re.sub(r"(?is)<noscript[^>]*>.*?</noscript>", " ", html)
+    html = re.sub(r"<!--.*?-->", " ", html, flags=re.S)
+    paragraphs: list[str] = []
+    for match in re.finditer(r"(?is)<p[^>]*>(.*?)</p>", html):
+        text = _strip_inline_html(match.group(1))
+        if len(text) >= 20 and not text.startswith("Reply To:"):
+            paragraphs.append(text)
+    if paragraphs:
+        return "\n\n".join(paragraphs)
+    return _strip_inline_html(html)
+
+
+def _extract_meta_description(html: str) -> str:
+    if not html:
         return ""
+
+    patterns = [
+        r'property=["\']og:description["\'][^>]*content=["\']([^"\']+)["\']',
+        r'content=["\']([^"\']+)["\'][^>]*property=["\']og:description["\']',
+        r'name=["\']description["\'][^>]*content=["\']([^"\']+)["\']',
+        r'content=["\']([^"\']+)["\'][^>]*name=["\']description["\']',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, html, re.I)
+        if match:
+            return _strip_inline_html(match.group(1))
+    return ""
+
+
+def _article_fetch_url(source_url: str) -> str:
     try:
-        parsed = urlparse(source_url)
+        parsed = urlparse(source_url.strip())
+        host = (parsed.netloc or "").lower()
+        path = parsed.path or ""
+        if (
+            ("bbc.com" in host or "bbc.co.uk" in host)
+            and "/articles/" in path
+            and not path.endswith(".lite")
+        ):
+            path = path.rstrip("/") + ".lite"
+            return parsed._replace(path=path).geturl()
+    except Exception:
+        pass
+    return source_url.strip()
+
+
+def extract_article_body_from_html(html: str, page_url: str) -> str:
+    host = (urlparse(page_url).netloc or "").lower()
+
+    if "ada.lk" in host:
+        wrap = re.search(
+            r'<div[^>]+class=["\'][^"\']*\bsingle-body-wrap\b[^"\']*["\'][^>]*>(.*?)</div>\s*<div[^>]+class=["\'][^"\']*social-media',
+            html,
+            re.I | re.S,
+        )
+        if not wrap:
+            wrap = re.search(
+                r'<div[^>]+class=["\'][^"\']*\bsingle-body-wrap\b[^"\']*["\'][^>]*>(.*?)</div>',
+                html,
+                re.I | re.S,
+            )
+        if wrap:
+            text = _html_fragment_to_paragraphs(wrap.group(1))
+            if len(text) >= MIN_BODY_CHARS:
+                return cap_body(text)
+
+    if "adaderana.lk" in host:
+        for match in re.finditer(
+            r'<div[^>]+class=["\'][^"\']*\bprose\b[^"\']*["\'][^>]*>(.*?)</div>',
+            html,
+            re.I | re.S,
+        ):
+            text = _html_fragment_to_paragraphs(match.group(1))
+            if len(text) >= MIN_BODY_CHARS:
+                return cap_body(text)
+
+    if "bbc.com" in host or "bbc.co.uk" in host:
+        paragraphs = []
+        for match in re.finditer(r"(?is)<p[^>]*>(.*?)</p>", html):
+            text = _strip_inline_html(match.group(1))
+            if len(text) >= 40 and not re.search(
+                r"BBC News|අවම ඩේටා|cookie|subscribe|privacy policy", text, re.I
+            ):
+                paragraphs.append(text)
+        joined = "\n\n".join(paragraphs)
+        if len(joined) >= MIN_BODY_CHARS:
+            return cap_body(joined)
+
+    generic_patterns = [
+        r"(?is)<article[^>]*>(.*?)</article>",
+        r'<div[^>]+itemprop=["\']articleBody["\'][^>]*>(.*?)</div>',
+        r'<div[^>]+class=["\'][^"\']*\bentry-content\b[^"\']*["\'][^>]*>(.*?)</div>',
+        r'<div[^>]+class=["\'][^"\']*\barticle-content\b[^"\']*["\'][^>]*>(.*?)</div>',
+        r'<div[^>]+id=["\']text-contents["\'][^>]*>(.*?)</div>',
+    ]
+    for pattern in generic_patterns:
+        block = re.search(pattern, html, re.I | re.S)
+        if not block:
+            continue
+        text = _html_fragment_to_paragraphs(block.group(1))
+        if len(text) >= MIN_BODY_CHARS:
+            return cap_body(text)
+
+    meta = _extract_meta_description(html)
+    if len(meta) >= 80:
+        return cap_body(meta)
+    return ""
+
+
+def _fetch_page_html(source_url: str) -> tuple[str, str]:
+    page_url = _article_fetch_url(source_url)
+    if not page_url:
+        return "", ""
+    try:
+        parsed = urlparse(page_url)
         referer = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else ""
     except Exception:
         referer = ""
@@ -106,14 +276,25 @@ def fetch_og_image(source_url: str) -> str:
     if referer:
         headers["Referer"] = referer
     try:
-        resp = requests.get(
-            source_url,
-            timeout=18,
-            headers=headers,
-        )
+        resp = requests.get(page_url, timeout=18, headers=headers)
         resp.raise_for_status()
-        html = resp.text
+        return resp.text, page_url
     except Exception:
+        return "", page_url
+
+
+def fetch_article_page_data(source_url: str) -> dict[str, str]:
+    html, page_url = _fetch_page_html(source_url)
+    if not html:
+        return {"coverImage": "", "body": ""}
+    return {
+        "coverImage": _extract_cover_from_html(html, page_url or source_url),
+        "body": extract_article_body_from_html(html, page_url or source_url),
+    }
+
+
+def _extract_cover_from_html(html: str, source_url: str) -> str:
+    if not html:
         return ""
 
     patterns = [
@@ -145,6 +326,10 @@ def fetch_og_image(source_url: str) -> str:
     return ""
 
 
+def fetch_og_image(source_url: str) -> str:
+    return fetch_article_page_data(source_url).get("coverImage") or ""
+
+
 def fetch_rss(url: str, limit: int = 8) -> list[dict[str, Any]]:
     resp = requests.get(url, timeout=25, headers={"User-Agent": UA})
     resp.raise_for_status()
@@ -165,14 +350,21 @@ def fetch_rss(url: str, limit: int = 8) -> list[dict[str, Any]]:
         if not title:
             continue
         cover = _first_image(entry, feed_base)
-        if not cover and link:
-            cover = fetch_og_image(link)
+        page_data: dict[str, str] | None = None
+        if link and (not cover or is_body_too_short(body, title)):
+            page_data = fetch_article_page_data(link)
+            if not cover:
+                cover = page_data.get("coverImage") or ""
+            if is_body_too_short(body, title):
+                page_body = page_data.get("body") or ""
+                if page_body and not is_body_too_short(page_body, title):
+                    body = page_body
         items.append(
             {
                 "title": title,
                 "sourceUrl": link,
                 "excerpt": summary[:400] if summary else title,
-                "body": body[:4000],
+                "body": cap_body(body)[:MAX_BODY_CHARS],
                 "coverImage": cover,
             }
         )
