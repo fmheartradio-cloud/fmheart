@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from html import unescape
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 import re
 
 import feedparser
@@ -94,14 +94,22 @@ def _first_image(entry: Any, feed_base: str = "") -> str:
     return ""
 
 
-def _fetch_og_image(source_url: str) -> str:
+def fetch_og_image(source_url: str) -> str:
     if not source_url:
         return ""
     try:
+        parsed = urlparse(source_url)
+        referer = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else ""
+    except Exception:
+        referer = ""
+    headers = {"User-Agent": UA, "Accept": "text/html,application/xhtml+xml,*/*;q=0.8"}
+    if referer:
+        headers["Referer"] = referer
+    try:
         resp = requests.get(
             source_url,
-            timeout=12,
-            headers={"User-Agent": UA, "Accept": "text/html,*/*"},
+            timeout=18,
+            headers=headers,
         )
         resp.raise_for_status()
         html = resp.text
@@ -113,11 +121,16 @@ def _fetch_og_image(source_url: str) -> str:
         r'content=["\']([^"\']+)["\'][^>]*property=["\']og:image(?::url)?["\']',
         r'name=["\']twitter:image(?::src)?["\'][^>]*content=["\']([^"\']+)["\']',
         r'content=["\']([^"\']+)["\'][^>]*name=["\']twitter:image(?::src)?["\']',
+        r'itemprop=["\']image["\'][^>]*content=["\']([^"\']+)["\']',
+        r'<link[^>]+rel=["\']image_src["\'][^>]+href=["\']([^"\']+)["\']',
     ]
     for pattern in patterns:
         match = re.search(pattern, html, re.I)
         if match:
-            return _absolutize(unescape(match.group(1)), source_url)
+            url = _absolutize(unescape(match.group(1)), source_url)
+            if url.startswith("http://"):
+                url = "https://" + url[len("http://") :]
+            return url
 
     for match in re.finditer(r'<img[^>]+src=["\']([^"\']+)["\']', html, re.I):
         src = unescape(match.group(1))
@@ -153,7 +166,7 @@ def fetch_rss(url: str, limit: int = 8) -> list[dict[str, Any]]:
             continue
         cover = _first_image(entry, feed_base)
         if not cover and link:
-            cover = _fetch_og_image(link)
+            cover = fetch_og_image(link)
         items.append(
             {
                 "title": title,

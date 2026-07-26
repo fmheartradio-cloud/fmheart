@@ -70,6 +70,18 @@ def already_ingested(db, hash_value: str) -> bool:
     return any(True for _ in q)
 
 
+def find_existing_by_hash(db, hash_value: str):
+    q = (
+        db.collection("articles")
+        .where("sourceHash", "==", hash_value)
+        .limit(1)
+        .stream()
+    )
+    for doc in q:
+        return doc.id, doc.to_dict()
+    return None, None
+
+
 def title_too_similar(db, title: str, threshold: float = 0.9) -> bool:
     """Lightweight duplicate guard: exact / near-exact title match in recent drafts+published."""
     needle = re.sub(r"\s+", " ", (title or "").strip().lower())
@@ -100,6 +112,7 @@ def title_too_similar(db, title: str, threshold: float = 0.9) -> bool:
 
 def save_draft(item: dict[str, Any]) -> str | None:
     """Insert article as draft. Returns doc id or None if skipped."""
+    from fetch_rss import fetch_og_image
     from sinhala_script import has_sinhala_news_text
 
     db = get_db()
@@ -113,7 +126,19 @@ def save_draft(item: dict[str, Any]) -> str | None:
         return None
 
     h = source_hash(url, title)
-    if already_ingested(db, h):
+    existing_id, existing = find_existing_by_hash(db, h)
+    if existing_id:
+        existing_cover = (existing.get("coverImage") or "").strip()
+        if not existing_cover:
+            cover = (item.get("coverImage") or "").strip()
+            if not cover and url:
+                cover = fetch_og_image(url)
+            if cover:
+                now = datetime.now(tz=timezone.utc).isoformat()
+                db.collection("articles").document(existing_id).update(
+                    {"coverImage": cover, "updatedAt": now}
+                )
+                return existing_id
         return None
     if title_too_similar(db, title):
         return None

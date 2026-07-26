@@ -114,7 +114,7 @@ function isImageUrl(url: string): boolean {
 }
 
 function absolutizeUrl(url: string, ...bases: (string | undefined)[]): string {
-  const trimmed = url.trim();
+  const trimmed = decodeHtmlEntities(url.trim());
   if (!trimmed) return "";
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   if (trimmed.startsWith("//")) return `https:${trimmed}`;
@@ -127,6 +127,36 @@ function absolutizeUrl(url: string, ...bases: (string | undefined)[]): string {
     }
   }
   return trimmed;
+}
+
+function normalizeArticleUrl(raw: string): string {
+  const trimmed = decodeHtmlEntities(raw.trim());
+  if (!trimmed) return "";
+  try {
+    return new URL(trimmed).href;
+  } catch {
+    return trimmed;
+  }
+}
+
+function normalizeCoverUrl(url: string): string {
+  const abs = absolutizeUrl(url);
+  if (!abs) return "";
+  if (abs.startsWith("http://")) return `https://${abs.slice("http://".length)}`;
+  return abs;
+}
+
+function extractItemLink(block: string): string {
+  const inner = xmlTagInner(block, "link").trim();
+  if (inner) return normalizeArticleUrl(stripHtml(inner));
+
+  const atomLink = block.match(/<link[^>]+href=["']([^"']+)["'][^>]*\/?>/i);
+  if (atomLink?.[1]) return normalizeArticleUrl(atomLink[1]);
+
+  const guid = xmlTagInner(block, "guid").trim();
+  if (guid) return normalizeArticleUrl(stripHtml(guid));
+
+  return "";
 }
 
 function xmlTagInner(block: string, tag: string): string {
@@ -184,7 +214,8 @@ function firstImageFromXml(
     if (fromHtml) candidates.push(fromHtml);
   }
 
-  return candidates.find((url) => Boolean(url)) || "";
+  const best = candidates.find((url) => Boolean(url)) || "";
+  return best ? normalizeCoverUrl(best) : "";
 }
 
 function extractImageFromPageHtml(html: string, pageUrl: string): string {
@@ -193,11 +224,15 @@ function extractImageFromPageHtml(html: string, pageUrl: string): string {
     /content=["']([^"']+)["'][^>]*property=["']og:image(?::url)?["']/i,
     /name=["']twitter:image(?::src)?["'][^>]*content=["']([^"']+)["']/i,
     /content=["']([^"']+)["'][^>]*name=["']twitter:image(?::src)?["']/i,
+    /itemprop=["']image["'][^>]*content=["']([^"']+)["']/i,
+    /content=["']([^"']+)["'][^>]*itemprop=["']image["']/i,
+    /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i,
+    /<link[^>]+href=["']([^"']+)["'][^>]+rel=["']image_src["']/i,
   ];
   for (const pattern of metaPatterns) {
     const match = html.match(pattern);
     if (match?.[1]) {
-      return absolutizeUrl(decodeHtmlEntities(match[1]), pageUrl);
+      return normalizeCoverUrl(absolutizeUrl(decodeHtmlEntities(match[1]), pageUrl));
     }
   }
 
@@ -208,7 +243,7 @@ function extractImageFromPageHtml(html: string, pageUrl: string): string {
     if (/logo|icon|avatar|pixel|spacer|1x1|tracking|badge|sprite/i.test(lower)) {
       continue;
     }
-    const abs = absolutizeUrl(decodeHtmlEntities(src), pageUrl);
+    const abs = normalizeCoverUrl(absolutizeUrl(decodeHtmlEntities(src), pageUrl));
     if (isImageUrl(abs)) return abs;
   }
 
@@ -216,23 +251,60 @@ function extractImageFromPageHtml(html: string, pageUrl: string): string {
 }
 
 async function fetchCoverImageFromPage(sourceUrl: string): Promise<string> {
-  if (!sourceUrl) return "";
+  const pageUrl = normalizeArticleUrl(sourceUrl);
+  if (!pageUrl) return "";
+
+  let referer = "";
   try {
-    const res = await fetch(sourceUrl, {
-      headers: {
-        "User-Agent": NEWSBOT_USER_AGENT,
-        Accept: "text/html,*/*",
-      },
-      redirect: "follow",
-      cache: "no-store",
-      signal: AbortSignal.timeout(12000),
-    });
-    if (!res.ok) return "";
-    const html = await res.text();
-    return extractImageFromPageHtml(html, sourceUrl);
+    referer = new URL(pageUrl).origin;
   } catch {
-    return "";
+    /* ignore */
   }
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const res = await fetch(pageUrl, {
+        headers: {
+          "User-Agent": NEWSBOT_USER_AGENT,
+          Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
+          ...(referer ? { Referer: referer } : {}),
+        },
+        redirect: "follow",
+        cache: "no-store",
+        signal: AbortSignal.timeout(attempt === 0 ? 12000 : 18000),
+      });
+      if (!res.ok) continue;
+      const html = await res.text();
+      const cover = extractImageFromPageHtml(html, pageUrl);
+      if (cover) return cover;
+    } catch {
+      /* retry once */
+    }
+  }
+  return "";
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+
+  async function worker() {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      results[index] = await fn(items[index]);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(limit, items.length) }, () =>
+    worker(),
+  );
+  await Promise.all(workers);
+  return results;
 }
 
 function parseRssItems(xml: string, limit: number): FeedItem[] {
@@ -241,9 +313,7 @@ function parseRssItems(xml: string, limit: number): FeedItem[] {
   const chunks = xml.split(/<item[\s>]/i).slice(1);
   for (const chunk of chunks.slice(0, limit)) {
     const title = stripHtml(xmlTagInner(chunk, "title"));
-    const link = stripHtml(
-      xmlTagInner(chunk, "link") || xmlTagInner(chunk, "guid"),
-    );
+    const link = extractItemLink(chunk);
     const description = stripHtml(xmlTagInner(chunk, "description"));
     const content = stripHtml(xmlTagInner(chunk, "content:encoded"));
     if (!title) continue;
@@ -272,13 +342,11 @@ async function fetchRss(url: string, limit: number): Promise<FeedItem[]> {
   const xml = await res.text();
   const items = parseRssItems(xml, limit);
 
-  return Promise.all(
-    items.map(async (item) => {
-      if (item.coverImage || !item.sourceUrl) return item;
-      const coverImage = await fetchCoverImageFromPage(item.sourceUrl);
-      return coverImage ? { ...item, coverImage } : item;
-    }),
-  );
+  return mapWithConcurrency(items, 3, async (item) => {
+    if (item.coverImage || !item.sourceUrl) return item;
+    const coverImage = await fetchCoverImageFromPage(item.sourceUrl);
+    return coverImage ? { ...item, coverImage } : item;
+  });
 }
 
 function jaccard(a: string, b: string): number {
@@ -295,6 +363,7 @@ export type IngestResult = {
   fetched: number;
   created: number;
   skipped: number;
+  backfilled: number;
   error?: string;
 };
 
@@ -335,6 +404,7 @@ export async function runNewsIngest(options?: {
       fetched: 0,
       created: 0,
       skipped: 0,
+      backfilled: 0,
     };
     try {
       const items = await fetchRss(src.rss, maxPerSource);
@@ -354,6 +424,21 @@ export async function runNewsIngest(options?: {
           .limit(1)
           .get();
         if (!dupHash.empty) {
+          const existing = dupHash.docs[0];
+          const existingCover = String(existing.data().coverImage || "").trim();
+          if (!existingCover) {
+            let cover = item.coverImage.trim();
+            if (!cover && item.sourceUrl) {
+              cover = await fetchCoverImageFromPage(item.sourceUrl);
+            }
+            if (cover) {
+              await existing.ref.update({
+                coverImage: cover,
+                updatedAt: new Date().toISOString(),
+              });
+              row.backfilled += 1;
+            }
+          }
           row.skipped += 1;
           continue;
         }
