@@ -39,8 +39,51 @@ function fillLogBars(
   }
 }
 
+/** Simulated EQ when Safari/iOS can't expose live-stream FFT (WebKit limitation). */
+function fillSimulatedBars(
+  out: Float32Array,
+  now: number,
+  volume: number,
+  playing: boolean,
+) {
+  if (!playing) {
+    for (let i = 0; i < out.length; i++) {
+      const t = i / (out.length - 1);
+      out[i] = 0.03 * (0.7 + 0.3 * Math.exp(-Math.pow((t - 0.25) / 0.4, 2)));
+    }
+    return;
+  }
+
+  const t = now / 1000;
+  const vol = 0.55 + Math.min(1, Math.max(0.15, volume)) * 0.55;
+
+  for (let i = 0; i < out.length; i++) {
+    const x = i / (out.length - 1);
+    // Bass / mid / presence envelope (radio-like)
+    const bass = Math.exp(-Math.pow((x - 0.12) / 0.14, 2));
+    const mid = Math.exp(-Math.pow((x - 0.42) / 0.22, 2));
+    const high = Math.exp(-Math.pow((x - 0.78) / 0.2, 2));
+    const shape = 0.35 * bass + 0.55 * mid + 0.4 * high;
+
+    const pulse =
+      0.55 +
+      0.25 * Math.sin(t * 5.2 + x * 9) +
+      0.2 * Math.sin(t * 8.7 + x * 17) +
+      0.15 * Math.sin(t * 13.1 + i * 0.7);
+    const flutter =
+      0.5 + 0.5 * Math.sin(t * 21 + i * 1.3) * Math.sin(t * 3.4 + x * 5);
+
+    let v = shape * (0.45 + 0.55 * pulse) * (0.75 + 0.25 * flutter) * vol;
+    // Occasional transient peaks
+    const hit = Math.sin(t * 2.15 + i * 0.31);
+    if (hit > 0.92) v *= 1.35;
+    out[i] = Math.min(1, Math.max(0.04, v));
+  }
+}
+
 /**
- * Realistic spectrum driven by Web Audio AnalyserNode.
+ * Spectrum: real AnalyserNode on Chromium; simulated motion on Apple WebKit
+ * (Safari cannot FFT live Icecast via createMediaElementSource without muting).
  */
 export function RadioSpectrum({ className }: Props) {
   const { isPlaying, isLoading, analyser, volume } = useRadio();
@@ -108,19 +151,13 @@ export function RadioSpectrum({ className }: Props) {
       }
 
       if (!hasSignal) {
-        for (let i = 0; i < BAR_COUNT; i++) {
-          const t = i / (BAR_COUNT - 1);
-          const base = active
-            ? 0.06 + 0.05 * Math.sin(now / 1800 + t * 3)
-            : 0.03;
-          targets[i] =
-            base * (0.7 + 0.3 * Math.exp(-Math.pow((t - 0.25) / 0.4, 2)));
-        }
+        fillSimulatedBars(targets, now, volume, active);
       }
 
-      const attack = active && hasSignal ? 0.2 : 0.08;
-      const release = active && hasSignal ? 0.12 : 0.07;
-      const peakFall = hasSignal ? 0.38 : 0.4;
+      const lively = active && (hasSignal || isPlaying);
+      const attack = lively ? 0.28 : 0.08;
+      const release = lively ? 0.16 : 0.07;
+      const peakFall = lively ? 0.55 : 0.35;
 
       for (let i = 0; i < BAR_COUNT; i++) {
         const target = Math.min(1, targets[i]!);
@@ -190,7 +227,7 @@ export function RadioSpectrum({ className }: Props) {
 
     rafRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [active, analyser, volume]);
+  }, [active, analyser, volume, isPlaying]);
 
   return (
     <div
