@@ -441,10 +441,104 @@ function extractArticleBodyFromHtml(html: string, pageUrl: string): string {
 }
 
 type ArticlePageData = {
+  /** Best cover for display (body photo when available). */
   coverImage: string;
+  /** og:image / twitter card URL — often a branded share card on Ada.lk. */
+  ogCoverImage: string;
   body: string;
   fetched: boolean;
 };
+
+const JUNK_IMAGE_RE =
+  /logo|icon|avatar|pixel|spacer|1x1|tracking|badge|sprite|facebook|instagram|youtube|twitter|instagrame/i;
+
+function isJunkImageUrl(url: string): boolean {
+  return JUNK_IMAGE_RE.test(url);
+}
+
+function isAdaHost(url: string): boolean {
+  return hostOf(url).includes("ada.lk");
+}
+
+function extractOgImageFromHtml(html: string, pageUrl: string): string {
+  const metaPatterns = [
+    /property=["']og:image(?::url)?["'][^>]*content=["']([^"']+)["']/i,
+    /content=["']([^"']+)["'][^>]*property=["']og:image(?::url)?["']/i,
+    /name=["']twitter:image(?::src)?["'][^>]*content=["']([^"']+)["']/i,
+    /content=["']([^"']+)["'][^>]*name=["']twitter:image(?::src)?["']/i,
+    /itemprop=["']image["'][^>]*content=["']([^"']+)["']/i,
+    /content=["']([^"']+)["'][^>]*itemprop=["']image["']/i,
+    /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i,
+    /<link[^>]+href=["']([^"']+)["'][^>]+rel=["']image_src["']/i,
+  ];
+  for (const pattern of metaPatterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) {
+      return normalizeCoverUrl(absolutizeUrl(decodeHtmlEntities(match[1]), pageUrl));
+    }
+  }
+  return "";
+}
+
+/** First real content photo from Ada single-body-wrap (skips share icons & related thumbs). */
+function extractAdaArticleCoverImage(html: string, pageUrl: string): string {
+  const wrap = extractContainerFragment(
+    html,
+    /<div[^>]+class=["'][^"']*\bsingle-body-wrap\b[^"']*["'][^>]*>/i,
+    [
+      /<div[^>]+class=["'][^"']*\bsocial-media-icons\b/i,
+      /<p class="text-uppercase mb-0 text-center">\s*popular news/i,
+      /<div[^>]+class=["'][^"']*\bcomment-form\b/i,
+      /\breco-body\b/i,
+    ],
+  );
+  if (!wrap) return "";
+
+  const candidates: string[] = [];
+  for (const match of wrap.matchAll(/<img[^>]+>/gi)) {
+    const tag = match[0];
+    const src = tag.match(/\bsrc=["']([^"']+)["']/i)?.[1];
+    if (!src || /^data:/i.test(src) || isJunkImageUrl(src)) continue;
+
+    const offset = match.index ?? 0;
+    const local = wrap.slice(Math.max(0, offset - 220), offset + tag.length);
+    if (/breaking_news|reco-body|related-news|popular news/i.test(local)) continue;
+
+    const abs = normalizeCoverUrl(absolutizeUrl(decodeHtmlEntities(src), pageUrl));
+    if (isImageUrl(abs)) candidates.push(abs);
+  }
+
+  const upload = candidates.find((url) =>
+    /cdn\.ada\.lk\/assets\/uploads\/image_/i.test(url),
+  );
+  return upload || candidates[0] || "";
+}
+
+function shouldUpgradeAdaCover(
+  existingCover: string,
+  preferredCover: string,
+  ogCover: string,
+): boolean {
+  if (!preferredCover || existingCover === preferredCover) return false;
+  if (!ogCover) return false;
+  const existingBase = existingCover.split("/").pop() || existingCover;
+  const ogBase = ogCover.split("/").pop() || ogCover;
+  return existingCover === ogCover || existingBase === ogBase;
+}
+
+function resolveCoverImage(
+  rssCover: string,
+  pageCover: string,
+  ogCover: string,
+  pageUrl: string,
+): string {
+  const trimmedRss = rssCover.trim();
+  if (isAdaHost(pageUrl) && pageCover) {
+    if (!trimmedRss) return pageCover;
+    if (shouldUpgradeAdaCover(trimmedRss, pageCover, ogCover)) return pageCover;
+  }
+  return trimmedRss || pageCover;
+}
 
 async function fetchArticlePageData(sourceUrl: string): Promise<ArticlePageData | null> {
   const pageUrl = articleFetchUrl(sourceUrl);
@@ -471,9 +565,10 @@ async function fetchArticlePageData(sourceUrl: string): Promise<ArticlePageData 
       });
       if (!res.ok) continue;
       const html = await res.text();
-      const coverImage = extractImageFromPageHtml(html, pageUrl);
+      const ogCoverImage = extractOgImageFromHtml(html, pageUrl);
+      const coverImage = extractImageFromPageHtml(html, pageUrl, ogCoverImage);
       const body = extractArticleBodyFromHtml(html, pageUrl);
-      return { coverImage, body, fetched: true };
+      return { coverImage, ogCoverImage, body, fetched: true };
     } catch {
       /* retry once */
     }
@@ -494,31 +589,22 @@ function resolveArticleBody(item: FeedItem, title: string): string {
   return capBody(item.body || item.excerpt || title);
 }
 
-function extractImageFromPageHtml(html: string, pageUrl: string): string {
-  const metaPatterns = [
-    /property=["']og:image(?::url)?["'][^>]*content=["']([^"']+)["']/i,
-    /content=["']([^"']+)["'][^>]*property=["']og:image(?::url)?["']/i,
-    /name=["']twitter:image(?::src)?["'][^>]*content=["']([^"']+)["']/i,
-    /content=["']([^"']+)["'][^>]*name=["']twitter:image(?::src)?["']/i,
-    /itemprop=["']image["'][^>]*content=["']([^"']+)["']/i,
-    /content=["']([^"']+)["'][^>]*itemprop=["']image["']/i,
-    /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i,
-    /<link[^>]+href=["']([^"']+)["'][^>]+rel=["']image_src["']/i,
-  ];
-  for (const pattern of metaPatterns) {
-    const match = html.match(pattern);
-    if (match?.[1]) {
-      return normalizeCoverUrl(absolutizeUrl(decodeHtmlEntities(match[1]), pageUrl));
-    }
+function extractImageFromPageHtml(
+  html: string,
+  pageUrl: string,
+  ogCoverImage = "",
+): string {
+  if (isAdaHost(pageUrl)) {
+    const bodyImage = extractAdaArticleCoverImage(html, pageUrl);
+    if (bodyImage) return bodyImage;
   }
+
+  const og = ogCoverImage || extractOgImageFromHtml(html, pageUrl);
+  if (og) return og;
 
   for (const match of html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)) {
     const src = match[1];
-    if (!src || /^data:/i.test(src)) continue;
-    const lower = src.toLowerCase();
-    if (/logo|icon|avatar|pixel|spacer|1x1|tracking|badge|sprite/i.test(lower)) {
-      continue;
-    }
+    if (!src || /^data:/i.test(src) || isJunkImageUrl(src)) continue;
     const abs = normalizeCoverUrl(absolutizeUrl(decodeHtmlEntities(src), pageUrl));
     if (isImageUrl(abs)) return abs;
   }
@@ -601,7 +687,12 @@ async function fetchRss(url: string, limit: number): Promise<FeedItem[]> {
     return {
       ...item,
       pageFetched: pageData.fetched,
-      coverImage: item.coverImage || pageData.coverImage,
+      coverImage: resolveCoverImage(
+        item.coverImage,
+        pageData.coverImage,
+        pageData.ogCoverImage,
+        item.sourceUrl,
+      ),
       body:
         needsBody && pageData.body && !bodyLooksLikeTitle(pageData.body, item.title)
           ? pageData.body
@@ -692,16 +783,37 @@ export async function runNewsIngest(options?: {
           const needsCover = !existingCover;
           const needsBody = bodyLooksLikeTitle(existingBody, title);
           const needsEntityFix = hasUndecodedHtmlEntities(existingBody);
+          const adaCoverUpgrade =
+            Boolean(existingCover) && isAdaHost(item.sourceUrl);
           const updates: Record<string, string | number> = {};
 
           let pageData: ArticlePageData | null = null;
-          if (item.sourceUrl && (needsCover || needsBody || needsEntityFix)) {
+          if (
+            item.sourceUrl &&
+            (needsCover || needsBody || needsEntityFix || adaCoverUpgrade)
+          ) {
             pageData = await fetchArticlePageData(item.sourceUrl);
           }
 
           if (needsCover) {
-            const cover = item.coverImage.trim() || pageData?.coverImage || "";
+            const cover =
+              resolveCoverImage(
+                item.coverImage,
+                pageData?.coverImage || "",
+                pageData?.ogCoverImage || "",
+                item.sourceUrl,
+              ) || "";
             if (cover) updates.coverImage = cover;
+          } else if (
+            adaCoverUpgrade &&
+            pageData?.coverImage &&
+            shouldUpgradeAdaCover(
+              existingCover,
+              pageData.coverImage,
+              pageData.ogCoverImage,
+            )
+          ) {
+            updates.coverImage = pageData.coverImage;
           }
 
           if (needsBody) {
