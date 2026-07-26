@@ -33,7 +33,7 @@ export function Header() {
         {/* Desktop: fill empty middle with tagline + now playing */}
         <div className="hidden min-w-0 flex-1 items-center justify-center px-4 lg:flex">
           <div className="max-w-xl text-center">
-            <p className="font-feature text-sm font-semibold tracking-wide text-fh-ink">
+            <p className="font-feature text-lg font-bold tracking-wide text-fh-ink md:text-xl lg:text-2xl">
               {SITE.taglineSi}
             </p>
             <p className="mt-0.5 truncate text-xs text-fh-muted">
