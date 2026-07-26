@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:gossip": "node scripts/seed-gossip.mjs",
+    "seed:content": "node scripts/seed-more-content.mjs",
+    "seed:content": "node scripts/seed-more-content.mjs"
   },
   "dependencies": {
     "firebase": "^12.16.0",

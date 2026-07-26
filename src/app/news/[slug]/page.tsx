@@ -8,6 +8,7 @@ import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
 import { ArticleJsonLd } from "@/components/seo/JsonLd";
+import { adSlot } from "@/lib/ads";
 import { SITE } from "@/lib/site";
 import { getArticleBySlug, listArticles } from "@/services/articles";
 
@@ -119,13 +120,21 @@ export default async function NewsArticlePage({ params }: Props) {
               />
             </div>
 
-            <AdSenseUnit label="After Featured Image" className="mt-6 min-h-[90px]" />
+            <AdSenseUnit
+              slot={adSlot("header")}
+              label="After Featured Image"
+              className="mt-6 min-h-[90px]"
+            />
 
             <div className="prose-article mt-6 space-y-4 font-article text-lg leading-8 text-fh-ink whitespace-pre-line">
               {article.body}
             </div>
 
-            <AdSenseUnit label="In-Article Ad" className="my-8 min-h-[90px]" />
+            <AdSenseUnit
+              slot={adSlot("inArticle")}
+              label="In-Article Ad"
+              className="my-8 min-h-[90px]"
+            />
 
             <div className="flex flex-wrap gap-2 border-t border-neutral-200 pt-6">
               <span className="text-sm font-semibold">Share:</span>
@@ -180,7 +189,11 @@ export default async function NewsArticlePage({ params }: Props) {
           </article>
 
           <aside className="space-y-5">
-            <AdSenseUnit label="Sidebar 300×250" className="min-h-[250px]" />
+            <AdSenseUnit
+              slot={adSlot("sidebar")}
+              label="Sidebar 300×250"
+              className="min-h-[250px]"
+            />
           </aside>
         </div>
       </main>

@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useUi } from "@/context/UiProvider";
 
 const items = [
   {
@@ -40,18 +43,11 @@ const items = [
       </svg>
     ),
   },
-  {
-    href: "#menu",
-    label: "Menu",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      </svg>
-    ),
-  },
 ];
 
 export function MobileBottomNav() {
+  const { toggleMenu } = useUi();
+
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-50 border-t border-neutral-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
@@ -69,6 +65,19 @@ export function MobileBottomNav() {
             </Link>
           </li>
         ))}
+        <li>
+          <button
+            type="button"
+            onClick={toggleMenu}
+            className="flex w-full flex-col items-center gap-1 py-2.5 text-fh-ink transition hover:text-fh-red"
+            aria-label="Menu"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            <span className="text-[10px] font-medium">Menu</span>
+          </button>
+        </li>
       </ul>
     </nav>
   );

@@ -8,6 +8,7 @@ import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
 import { ArticleJsonLd } from "@/components/seo/JsonLd";
+import { adSlot } from "@/lib/ads";
 import { SITE } from "@/lib/site";
 import { getArticleBySlug, listArticles } from "@/services/articles";
 
@@ -82,7 +83,11 @@ export default async function GossipArticlePage({ params }: Props) {
             sizes="800px"
           />
         </div>
-        <AdSenseUnit label="Gossip In-Article" className="mt-6 min-h-[90px]" />
+        <AdSenseUnit
+          slot={adSlot("inArticle")}
+          label="Gossip In-Article"
+          className="mt-6 min-h-[90px]"
+        />
         <div className="mt-6 font-article text-lg leading-8 whitespace-pre-line">
           {article.body}
         </div>

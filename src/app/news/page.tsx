@@ -6,6 +6,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
+import { adSlot } from "@/lib/ads";
 import { listArticles } from "@/services/articles";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,11 @@ export default async function NewsPage() {
           Latest news from FM Heart newsroom
         </p>
 
-        <AdSenseUnit label="News Header Banner" className="mt-6 min-h-[90px]" />
+        <AdSenseUnit
+          slot={adSlot("header")}
+          label="News Header Banner"
+          className="mt-6 min-h-[90px]"
+        />
 
         <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {articles.map((article) => (

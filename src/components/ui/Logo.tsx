@@ -2,11 +2,30 @@ import Image from "next/image";
 import Link from "next/link";
 
 type LogoProps = {
-  variant?: "full" | "icon" | "compact" | "badge";
+  variant?: "full" | "icon" | "compact" | "badge" | "tagline";
   className?: string;
 };
 
 export function Logo({ variant = "full", className = "" }: LogoProps) {
+  if (variant === "tagline") {
+    return (
+      <Link
+        href="/"
+        className={`inline-flex max-w-full shrink min-w-0 items-center ${className}`}
+        aria-label="FM Heart"
+      >
+        <Image
+          src="/logo/heder-new.png"
+          alt="FM Heart — යෞවනයේ හද ගැහෙන රිද්මය"
+          width={320}
+          height={80}
+          priority
+          className="h-14 w-auto max-w-[min(100%,300px)] object-contain object-left sm:h-[3.75rem] sm:max-w-[340px] md:h-16 md:max-w-[420px]"
+        />
+      </Link>
+    );
+  }
+
   if (variant === "icon") {
     return (
       <Link href="/" className={`inline-flex shrink-0 ${className}`} aria-label="FM Heart">

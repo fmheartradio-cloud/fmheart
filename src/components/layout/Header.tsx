@@ -4,34 +4,32 @@ import Link from "next/link";
 import { useState } from "react";
 import { Logo } from "@/components/ui/Logo";
 import { useRadio } from "@/context/RadioProvider";
+import { useUi } from "@/context/UiProvider";
 import { navLinks } from "@/data/mock";
 
 export function Header() {
-  const [menuOpen, setMenuOpen] = useState(false);
+  const { menuOpen, setMenuOpen, toggleMenu } = useUi();
   const [searchOpen, setSearchOpen] = useState(false);
   const { isPlaying, isLoading, toggle } = useRadio();
 
   return (
     <header className="sticky top-0 z-40 border-b border-neutral-200 bg-white/95 backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-2.5 md:px-4 md:py-3">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-1.5 md:gap-3 md:px-4 md:py-3">
         <button
           type="button"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-neutral-200 text-fh-ink md:hidden"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-neutral-200 text-fh-ink md:hidden"
           aria-label="Menu"
           aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((v) => !v)}
+          onClick={toggleMenu}
         >
           <span className="text-xl leading-none">{menuOpen ? "✕" : "☰"}</span>
         </button>
 
-        <div className="hidden md:block">
-          <Logo />
-        </div>
-        <div className="md:hidden">
-          <Logo variant="icon" />
+        <div className="flex min-w-0 flex-1 items-center md:flex-none">
+          <Logo variant="tagline" />
         </div>
 
-        <div className="flex items-center gap-2 md:gap-3">
+        <div className="flex shrink-0 items-center gap-2 md:gap-3">
           <button
             type="button"
             onClick={() => void toggle()}

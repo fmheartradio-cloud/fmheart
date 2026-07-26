@@ -13,6 +13,7 @@ import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
 import { videos } from "@/data/mock";
+import { adSlot } from "@/lib/ads";
 import { cmsToCard, listArticles } from "@/services/articles";
 
 export const dynamic = "force-dynamic";
@@ -40,26 +41,36 @@ export default async function HomePage() {
       <TopBar />
       <Header />
 
-      <main>
-        <div className="mx-auto grid max-w-7xl lg:grid-cols-[1fr_320px]">
-          <HeroSlider />
-          <div className="min-h-[320px] lg:min-h-full">
-            <LiveRadioPlayer />
+      <main className="overflow-x-hidden">
+        <div className="mx-auto w-full max-w-7xl px-3 md:px-4">
+          <div className="grid w-full lg:grid-cols-[1fr_320px]">
+            <HeroSlider />
+            <div className="min-h-[320px] w-full min-w-0 lg:min-h-full">
+              <LiveRadioPlayer />
+            </div>
           </div>
-        </div>
 
-        <div className="mx-auto max-w-7xl px-3 py-6 md:px-4 md:py-8">
-          <AdSenseUnit label="Header Banner (728×90)" className="mb-8 min-h-[90px]" />
+          <div className="w-full py-4 md:py-6">
+            <AdSenseUnit
+              slot={adSlot("header")}
+              label="Header Banner"
+              className="w-full min-h-[90px]"
+            />
+          </div>
 
-          <div className="grid gap-8 lg:grid-cols-[1fr_300px]">
-            <div className="space-y-10">
+          <div className="grid w-full gap-8 pb-8 lg:grid-cols-[1fr_300px]">
+            <div className="min-w-0 space-y-10">
               <NewsGrid
                 title="නවතම ප්‍රවෘත්ති"
                 articles={newsCards}
                 viewAllHref="/news"
               />
 
-              <AdSenseUnit label="In-Feed Ad" className="min-h-[100px]" />
+              <AdSenseUnit
+                slot={adSlot("inArticle")}
+                label="In-Feed Ad"
+                className="min-h-[100px]"
+              />
 
               <NewsGrid
                 title="Gossip & Entertainment"
@@ -72,10 +83,14 @@ export default async function HomePage() {
               <CategoryIcons />
             </div>
 
-            <aside className="space-y-5">
+            <aside className="min-w-0 space-y-5">
               <AdvertiseWidget />
               <MostRead articles={mostReadCards} />
-              <AdSenseUnit label="Sidebar 300×250" className="min-h-[250px]" />
+              <AdSenseUnit
+                slot={adSlot("sidebar")}
+                label="Sidebar 300×250"
+                className="min-h-[250px]"
+              />
               <div className="border border-neutral-200 bg-fh-surface p-4">
                 <p className="font-heading text-sm font-bold">
                   WhatsApp Channel
@@ -100,7 +115,11 @@ export default async function HomePage() {
 
         <div className="mx-auto max-w-7xl space-y-8 px-3 py-8 md:px-4">
           <BrandPromo />
-          <AdSenseUnit label="Before Footer Banner" className="min-h-[90px]" />
+          <AdSenseUnit
+            slot={adSlot("header")}
+            label="Before Footer Banner"
+            className="min-h-[90px]"
+          />
         </div>
       </main>
 

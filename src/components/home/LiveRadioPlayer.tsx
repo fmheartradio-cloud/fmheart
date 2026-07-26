@@ -3,14 +3,22 @@
 import Link from "next/link";
 import { useRadio } from "@/context/RadioProvider";
 import { SITE } from "@/lib/site";
-import { recentlyPlayed } from "@/data/mock";
+import { RadioSpectrum } from "@/components/home/RadioSpectrum";
 
 export function LiveRadioPlayer() {
-  const { isPlaying, isLoading, error, meta, toggle, volume, setVolume } =
-    useRadio();
+  const {
+    isPlaying,
+    isLoading,
+    error,
+    meta,
+    recent,
+    toggle,
+    volume,
+    setVolume,
+  } = useRadio();
 
   return (
-    <aside className="flex h-full flex-col bg-fh-ink text-white">
+    <aside className="flex h-full w-full flex-col bg-fh-ink text-white">
       <div className="border-b border-white/10 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -22,7 +30,7 @@ export function LiveRadioPlayer() {
             </h2>
           </div>
           <span className="text-xs text-neutral-400">
-            {meta.listeners.toLocaleString()} listening
+            {isPlaying ? "Streaming now" : "24/7 Live"}
           </span>
         </div>
       </div>
@@ -50,6 +58,8 @@ export function LiveRadioPlayer() {
           </div>
         </div>
 
+        <RadioSpectrum />
+
         <label className="block">
           <span className="mb-1 block text-[11px] tracking-wider text-neutral-500 uppercase">
             Volume
@@ -75,22 +85,28 @@ export function LiveRadioPlayer() {
           <p className="mb-2 text-[11px] tracking-wider text-neutral-500 uppercase">
             Recently Played
           </p>
-          <ul className="space-y-2">
-            {recentlyPlayed.map((track) => (
-              <li
-                key={track.title}
-                className="flex items-center justify-between gap-2 border-b border-white/5 pb-2 text-sm"
-              >
-                <span className="min-w-0 truncate">
-                  <span className="text-neutral-200">{track.title}</span>
-                  <span className="text-neutral-500"> — {track.artist}</span>
-                </span>
-                <span className="shrink-0 text-xs text-neutral-500">
-                  {track.time}
-                </span>
-              </li>
-            ))}
-          </ul>
+          {recent.length === 0 ? (
+            <p className="text-xs text-neutral-500">
+              ගීත වෙනස් වෙනකොට මෙතන live update වෙයි.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {recent.map((track) => (
+                <li
+                  key={`${track.title}-${track.artist}-${track.time}`}
+                  className="flex items-center justify-between gap-2 border-b border-white/5 pb-2 text-sm"
+                >
+                  <span className="min-w-0 truncate">
+                    <span className="text-neutral-200">{track.title}</span>
+                    <span className="text-neutral-500"> — {track.artist}</span>
+                  </span>
+                  <span className="shrink-0 text-xs text-neutral-500">
+                    {track.time}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="mt-auto grid gap-2">

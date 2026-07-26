@@ -48,13 +48,13 @@ export function NewsGrid({ title, articles, viewAllHref = "#" }: NewsGridProps) 
         </Link>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {articles.map((article) => {
           const href = article.href || `/news/${article.slug}`;
           return (
-            <article key={article.id} className="group">
-              <Link href={href} className="block">
-                <div className="relative aspect-[16/10] overflow-hidden bg-neutral-200">
+            <article key={article.id} className="group min-w-0">
+              <Link href={href} className="block w-full max-w-full">
+                <div className="relative aspect-[16/10] w-full overflow-hidden bg-neutral-200">
                   <Image
                     src={article.image}
                     alt=""

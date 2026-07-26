@@ -5,12 +5,8 @@ export const navLinks = [
   { href: "/live", label: "LIVE RADIO" },
   { href: "/news", label: "ප්‍රවෘත්ති" },
   { href: "/gossip", label: "GOSSIP" },
-  { href: "/entertainment", label: "විනෝදාංග" },
-  { href: "/music", label: "සංගීතය" },
   { href: "/videos", label: "VIDEOS" },
-  { href: "/podcast", label: "PODCAST" },
-  { href: "/gallery", label: "GALLERY" },
-  { href: "/events", label: "EVENTS" },
+  { href: "/advertise", label: "ADVERTISE" },
   { href: "/contact", label: "CONTACT" },
 ];
 

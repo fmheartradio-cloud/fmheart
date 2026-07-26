@@ -8,6 +8,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
+import { adSlot } from "@/lib/ads";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -50,7 +51,11 @@ export default function LivePage() {
         </section>
 
         <div className="mx-auto max-w-7xl space-y-8 px-4 py-10">
-          <AdSenseUnit label="Live Page Banner" className="min-h-[90px]" />
+          <AdSenseUnit
+            slot={adSlot("header")}
+            label="Live Page Banner"
+            className="min-h-[90px]"
+          />
           <div className="grid gap-6 md:grid-cols-3">
             {[
               {

@@ -38,9 +38,10 @@ export function AdSenseUnit({
 
   if (!ready) {
     return (
-      <aside
-        className={`flex min-h-[90px] items-center justify-center border border-dashed border-neutral-300 bg-fh-surface text-center ${className}`}
+      <div
+        className={`flex min-h-[90px] w-full items-center justify-center border border-dashed border-neutral-300 bg-neutral-100 text-center ${className}`}
         aria-label={label}
+        style={{ display: "flex", width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
       >
         <div className="px-4 py-3">
           <p className="text-[10px] uppercase tracking-[0.2em] text-fh-muted">
@@ -50,14 +51,14 @@ export function AdSenseUnit({
             {label}
           </p>
         </div>
-      </aside>
+      </div>
     );
   }
 
   return (
     <ins
-      className={`adsbygoogle block ${className}`}
-      style={{ display: "block" }}
+      className={`adsbygoogle block w-full ${className}`}
+      style={{ display: "block", width: "100%", maxWidth: "100%" }}
       data-ad-client={client}
       data-ad-slot={slot}
       data-ad-format={format}
