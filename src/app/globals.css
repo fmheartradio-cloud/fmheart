@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "AF Sigiri";
+  src: url("/fonts/AFSigiri.ttf") format("truetype");
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --fh-red: #d50000;
   --fh-red-dark: #b71c1c;
@@ -10,6 +18,7 @@
   --fh-surface: #f5f5f5;
   --fh-white: #ffffff;
   --fh-whatsapp: #25d366;
+  --font-sigiri: "AF Sigiri", var(--font-heading), sans-serif;
 }
 
 @theme inline {
@@ -25,6 +34,7 @@
   --font-heading: var(--font-heading);
   --font-article: var(--font-article);
   --font-feature: var(--font-feature);
+  --font-sigiri: "AF Sigiri", var(--font-heading), sans-serif;
 }
 
 * {
@@ -86,4 +96,8 @@ body {
 
 .animate-fade-up {
   animation: fade-up 0.55s ease-out both;
+}
+
+.font-sigiri {
+  font-family: "AF Sigiri", var(--font-heading), sans-serif;
 }

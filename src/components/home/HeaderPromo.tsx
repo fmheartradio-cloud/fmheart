@@ -10,7 +10,7 @@ export function HeaderPromo() {
           <p className="font-heading text-[11px] tracking-[0.2em] text-fh-red uppercase">
             FM Heart Live
           </p>
-          <p className="mt-1 font-heading text-xl font-extrabold md:text-2xl lg:text-3xl">
+          <p className="mt-1 font-sigiri text-xl font-extrabold md:text-2xl lg:text-3xl">
             {SITE.taglineSi}
           </p>
           <p className="mt-0.5 text-sm text-white/70">
