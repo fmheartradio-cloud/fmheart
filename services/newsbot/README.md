@@ -1,94 +1,69 @@
 # FM Heart News Bot
 
-**Order of operations**
-
-1. Service account + local dry run  
-2. Admin review drafts at `/admin/articles`  
-3. GitHub Actions 24/7 schedule (this repo)  
-4. Later: AI rewrite / more sources  
-
 ## Flow
 
-RSS feeds → duplicate check → Firestore `articles` as **draft** → you **Publish** in Admin.
+RSS → duplicate check → Firestore **draft** → Admin **Publish** at `/admin/articles`
 
-## Why drafts?
+Two runners (same drafts):
 
-Full republication of other sites' articles can cause copyright issues. This bot:
-
-- Uses **RSS only** (no HTML scrape in Phase 1)
-- Saves feed text with **source attribution**
-- Sets `status: draft` for review before publish
+1. **Vercel Cron** (preferred on this stack) → `GET/POST /api/cron/newsbot`
+2. **Python** under `services/newsbot/` (local / optional GitHub Actions)
 
 ---
 
-## Step 1 — Firebase service account
+## YOU must do (one-time) — I cannot do this for you
 
-1. [Firebase Console](https://console.firebase.google.com) → project `fm-heart-eghluo`  
-2. Project settings → Service accounts → **Generate new private key**  
-3. Keep the JSON private — **never commit it**
+### A) Firebase service account
+1. Firebase Console → project settings → Service accounts → **Generate new private key**
+2. Keep the JSON private
 
-Firestore database id must be **`fmheart`**.
+### B) Vercel env vars
+Project → Settings → Environment Variables (Production + Preview):
 
----
+| Name | Value |
+|------|--------|
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Full JSON contents |
+| `FIRESTORE_DB_ID` | `fmheart` |
+| `CRON_SECRET` | Long random string (e.g. password manager) |
 
-## Step 2 — Local run
+Redeploy after saving.
 
-```bash
-cd services/newsbot
-pip install -r requirements.txt
+### C) Manual test after deploy
+```powershell
+curl -X POST "https://fmheart-tau.vercel.app/api/cron/newsbot" -H "Authorization: Bearer YOUR_CRON_SECRET"
 ```
 
-PowerShell:
+Then open `/admin/articles` → Drafts → Publish.
+
+---
+
+## Optional: GitHub Actions every 10 min
+
+Local commit may exist for `.github/workflows/newsbot.yml`. Push needs `workflow` scope:
 
 ```powershell
+gh auth refresh -h github.com -s workflow
+git push
+```
+
+Secret: `FIREBASE_SERVICE_ACCOUNT_JSON`
+
+---
+
+## Optional: local Python
+
+```powershell
+cd services/newsbot
+pip install -r requirements.txt
 $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\serviceAccount.json"
 $env:FIRESTORE_DB_ID="fmheart"
 python main.py
 ```
 
-Or paste JSON:
-
-```powershell
-$env:FIREBASE_SERVICE_ACCOUNT_JSON=(Get-Content -Raw serviceAccount.json)
-$env:FIRESTORE_DB_ID="fmheart"
-python main.py
-```
-
-Edit `sources.yaml` to enable/disable feeds.
-
-Then open `/admin/articles` → **Drafts** → **Publish**.
-
 ---
 
-## Step 3 — GitHub Actions (every 10 minutes)
+## Notes
 
-Workflow: [`.github/workflows/newsbot.yml`](../../.github/workflows/newsbot.yml)
-
-Repo → **Settings → Secrets and variables → Actions** → add:
-
-| Secret | Value |
-|--------|--------|
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | Entire service account JSON (one line / raw file contents) |
-| `FIRESTORE_DB_ID` | `fmheart` (optional; defaults in workflow) |
-
-Then: **Actions → News Collector → Run workflow** (manual test).
-
-After that, cron runs about every 10 minutes.
-
----
-
-## Firestore fields
-
-Matches site `CmsArticle`, plus:
-
-- `source`, `sourceUrl`, `sourceHash`
-- `ingestedBy: "newsbot"`
-- `status: "draft"`
-
----
-
-## Later (Phase 2+)
-
-- OpenAI Sinhala rewrite before draft/publish  
-- Extra RSS sources  
-- Optional HTML adapters only where ToS/robots allow  
+- Drafts only (copyright/quality).
+- RSS only in this phase (no HTML scrape).
+- Vercel Hobby may limit cron frequency; if 15‑min does not fire often enough, use GitHub Actions after granting `workflow` scope.
