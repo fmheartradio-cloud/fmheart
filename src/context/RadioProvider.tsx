@@ -50,15 +50,10 @@ const DEFAULT_META: RadioMeta = {
 
 const POLL_MS = 15_000;
 const MAX_RECENT = 8;
-
-/** Same-origin proxy — enables real FFT spectrum via Web Audio (Chromium). */
 const PROXY_STREAM = "/api/radio-stream";
 
-/**
- * Safari / all iOS browsers: createMediaElementSource on live Icecast often
- * mutes audio or returns empty analyser data. Use plain <audio> + direct URL.
- */
-function useSimpleAudioPath() {
+/** Safari + all iOS browsers (Chrome/Firefox on iOS are WebKit too). */
+function isAppleWebKitPlayback() {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent;
   const iOS =
@@ -66,8 +61,10 @@ function useSimpleAudioPath() {
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const safariDesktop =
     /Safari/.test(ua) &&
-    !/Chrome|Chromium|CriOS|Edg|Firefox|FxiOS|OPR|Android/i.test(ua);
-  return iOS || safariDesktop;
+    !/Chrome|Chromium|Edg|Firefox|OPR|Android/i.test(ua);
+  // CriOS / FxiOS still WebKit on iOS
+  const iOSBrowser = iOS;
+  return iOSBrowser || safariDesktop;
 }
 
 function formatClock(d = new Date()) {
@@ -82,20 +79,6 @@ function trackKey(song: string, artist: string) {
   return `${song.trim().toLowerCase()}::${artist.trim().toLowerCase()}`;
 }
 
-function streamUrls(simple: boolean) {
-  const bust = Date.now();
-  if (simple) {
-    return [
-      `${SITE.streamUrl}?t=${bust}`,
-      `${PROXY_STREAM}?t=${bust}`,
-    ];
-  }
-  return [
-    `${PROXY_STREAM}?t=${bust}`,
-    `${SITE.streamUrl}?t=${bust}`,
-  ];
-}
-
 export function RadioProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
@@ -104,7 +87,8 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const prevMetaRef = useRef<RadioMeta>(DEFAULT_META);
   const wantPlayRef = useRef(false);
-  const simplePathRef = useRef(false);
+  const appleRef = useRef(false);
+  const reconnectTimer = useRef<number | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -114,9 +98,16 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   const [recent, setRecent] = useState<RecentTrack[]>([]);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
 
+  const clearReconnect = useCallback(() => {
+    if (reconnectTimer.current != null) {
+      window.clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = null;
+    }
+  }, []);
+
   const ensureGraph = useCallback(async () => {
     const audio = audioRef.current;
-    if (!audio || simplePathRef.current) return;
+    if (!audio || appleRef.current) return;
 
     if (!ctxRef.current) {
       const Ctx =
@@ -150,48 +141,99 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     }
   }, [volume]);
 
-  useEffect(() => {
-    simplePathRef.current = useSimpleAudioPath();
-
-    const audio = new Audio();
-    audio.preload = "none";
-    // iOS Safari: inline playback (also set as attributes for older WebKit)
-    (audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
-    audio.setAttribute("playsinline", "true");
-    audio.setAttribute("webkit-playsinline", "true");
-
-    if (!simplePathRef.current) {
+  const assignStream = useCallback((audio: HTMLAudioElement, url: string) => {
+    audio.muted = false;
+    if (appleRef.current) {
+      audio.removeAttribute("crossorigin");
+      audio.removeAttribute("crossOrigin");
+      // Fragment busts cache without breaking Icecast query parsing
+      const sep = url.includes("#") ? "" : `#${Date.now()}`;
+      audio.src = `${url}${sep}`;
+    } else {
       audio.crossOrigin = "anonymous";
+      audio.src = url;
+      audio.load();
     }
+  }, []);
 
-    audioRef.current = audio;
+  const startStream = useCallback(
+    async (preferProxy: boolean) => {
+      const audio = audioRef.current;
+      if (!audio) return;
+
+      const direct = SITE.streamUrl;
+      const proxy = `${PROXY_STREAM}?t=${Date.now()}`;
+
+      if (appleRef.current) {
+        // Direct HTTPS Icecast — no Web Audio, no query bust, no load()
+        audio.volume = volume;
+        assignStream(audio, direct);
+        await audio.play();
+        return;
+      }
+
+      await ensureGraph();
+      audio.volume = 1;
+      const primary = preferProxy ? proxy : direct;
+      const fallback = preferProxy ? direct : proxy;
+      try {
+        assignStream(audio, primary);
+        await audio.play();
+      } catch {
+        audio.removeAttribute("crossOrigin");
+        assignStream(audio, fallback);
+        await audio.play();
+      }
+      if (ctxRef.current?.state === "suspended") {
+        await ctxRef.current.resume();
+      }
+    },
+    [assignStream, ensureGraph, volume],
+  );
+
+  const scheduleReconnect = useCallback(() => {
+    if (!wantPlayRef.current) return;
+    clearReconnect();
+    reconnectTimer.current = window.setTimeout(() => {
+      if (!wantPlayRef.current || !audioRef.current) return;
+      setIsLoading(true);
+      void startStream(false).catch(() => {
+        setError("Stream එක reconnect වුණේ නැහැ. Play නැවත ඔබන්න.");
+        setIsLoading(false);
+      });
+    }, 1500);
+  }, [clearReconnect, startStream]);
+
+  useEffect(() => {
+    appleRef.current = isAppleWebKitPlayback();
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    audio.preload = "none";
+    (audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
+    audio.setAttribute("playsinline", "");
+    audio.setAttribute("webkit-playsinline", "");
+    audio.setAttribute("x-webkit-airplay", "allow");
 
     const onPlaying = () => {
       setIsPlaying(true);
       setIsLoading(false);
       setError(null);
+      clearReconnect();
     };
-    const onPause = () => setIsPlaying(false);
+    const onPause = () => {
+      if (!wantPlayRef.current) setIsPlaying(false);
+    };
     const onWaiting = () => setIsLoading(true);
     const onCanPlay = () => setIsLoading(false);
+    const onStalled = () => {
+      if (wantPlayRef.current) scheduleReconnect();
+    };
     const onError = () => {
       setIsLoading(false);
-      setIsPlaying(false);
-      if (wantPlayRef.current) {
-        window.setTimeout(() => {
-          if (!wantPlayRef.current || !audioRef.current) return;
-          const urls = streamUrls(simplePathRef.current);
-          const next = urls[0]!;
-          if (simplePathRef.current) {
-            audioRef.current.removeAttribute("crossOrigin");
-          }
-          audioRef.current.src = next;
-          audioRef.current.load();
-          void audioRef.current.play().catch(() => {
-            setError("Stream එක connect වුණේ නැහැ. නැවත try කරන්න.");
-          });
-        }, 1200);
-      } else {
+      if (wantPlayRef.current) scheduleReconnect();
+      else {
+        setIsPlaying(false);
         setError("Stream එක connect වුණේ නැහැ. නැවත try කරන්න.");
       }
     };
@@ -200,29 +242,29 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     audio.addEventListener("pause", onPause);
     audio.addEventListener("waiting", onWaiting);
     audio.addEventListener("canplay", onCanPlay);
+    audio.addEventListener("stalled", onStalled);
     audio.addEventListener("error", onError);
 
     return () => {
       wantPlayRef.current = false;
+      clearReconnect();
       audio.pause();
-      audio.removeAttribute("src");
-      audio.load();
       audio.removeEventListener("playing", onPlaying);
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("waiting", onWaiting);
       audio.removeEventListener("canplay", onCanPlay);
+      audio.removeEventListener("stalled", onStalled);
       audio.removeEventListener("error", onError);
       void ctxRef.current?.close();
       ctxRef.current = null;
       analyserRef.current = null;
       gainRef.current = null;
       sourceRef.current = null;
-      audioRef.current = null;
     };
-  }, []);
+  }, [clearReconnect, scheduleReconnect]);
 
   useEffect(() => {
-    if (gainRef.current && !simplePathRef.current) {
+    if (gainRef.current && !appleRef.current) {
       gainRef.current.gain.value = volume;
     } else if (audioRef.current) {
       audioRef.current.volume = volume;
@@ -291,57 +333,36 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     };
   }, [updateFromApi]);
 
-  const tryPlayUrl = useCallback(async (url: string, useCors: boolean) => {
-    const audio = audioRef.current;
-    if (!audio) throw new Error("no audio");
-
-    if (useCors) {
-      audio.crossOrigin = "anonymous";
-    } else {
-      audio.removeAttribute("crossOrigin");
-    }
-
-    audio.src = url;
-    audio.load();
-    await audio.play();
-  }, []);
-
   const play = useCallback(async () => {
     const audio = audioRef.current;
     if (!audio) return;
+
+    // Mark intent synchronously inside the tap gesture
     wantPlayRef.current = true;
     setIsLoading(true);
     setError(null);
-
-    const simple = simplePathRef.current;
-    const urls = streamUrls(simple);
+    clearReconnect();
 
     try {
-      if (simple) {
-        // Plain element playback — reliable on Apple WebKit
+      // Apple: do not await anything before play() except the play promise itself
+      if (appleRef.current) {
+        audio.muted = false;
         audio.volume = volume;
-        await tryPlayUrl(urls[0]!, false);
+        assignStream(audio, SITE.streamUrl);
+        await audio.play();
       } else {
-        // Chromium: Web Audio graph for spectrum (user-gesture resume first)
-        await ensureGraph();
-        audio.volume = 1;
-        try {
-          await tryPlayUrl(urls[0]!, true);
-        } catch {
-          audio.removeAttribute("crossOrigin");
-          await tryPlayUrl(urls[1]!, false);
-        }
-        if (ctxRef.current?.state === "suspended") {
-          await ctxRef.current.resume();
-        }
+        await startStream(true);
       }
     } catch (err) {
-      // Last resort: other URL
       try {
-        audio.volume = simple ? volume : 1;
-        await tryPlayUrl(urls[1] ?? urls[0]!, false);
-        if (!simple && ctxRef.current?.state === "suspended") {
-          await ctxRef.current.resume();
+        // Fallback: same-origin proxy (HTTPS) without Web Audio on Apple
+        audio.muted = false;
+        audio.volume = volume;
+        if (appleRef.current) {
+          assignStream(audio, `${PROXY_STREAM}?t=${Date.now()}`);
+          await audio.play();
+        } else {
+          await startStream(false);
         }
       } catch (err2) {
         wantPlayRef.current = false;
@@ -350,7 +371,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         const name = err2 instanceof DOMException ? err2.name : "";
         if (name === "NotAllowedError") {
           setError(
-            "Browser එකේ autoplay block කරලා තියෙනවා. Play නැවත touch/click කරන්න.",
+            "Browser එකේ autoplay block කරලා තියෙනවා. Play නැවත touch කරන්න.",
           );
         } else {
           setError("Play කිරීම අසාර්ථකයි. නැවත try කරන්න.");
@@ -358,23 +379,27 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         void err;
       }
     }
-  }, [ensureGraph, tryPlayUrl, volume]);
+  }, [assignStream, clearReconnect, startStream, volume]);
 
   const pause = useCallback(() => {
     const audio = audioRef.current;
     wantPlayRef.current = false;
+    clearReconnect();
     if (!audio) return;
     audio.pause();
-    audio.removeAttribute("src");
-    audio.load();
+    // Keep src on Apple so resume is faster / more reliable
+    if (!appleRef.current) {
+      audio.removeAttribute("src");
+      audio.load();
+    }
     setIsPlaying(false);
     setIsLoading(false);
-  }, []);
+  }, [clearReconnect]);
 
   const toggle = useCallback(async () => {
-    if (isPlaying) pause();
+    if (wantPlayRef.current && (isPlaying || isLoading)) pause();
     else await play();
-  }, [isPlaying, pause, play]);
+  }, [isPlaying, isLoading, pause, play]);
 
   const setVolume = useCallback((v: number) => {
     setVolumeState(Math.min(1, Math.max(0, v)));
@@ -410,7 +435,18 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <RadioContext.Provider value={value}>{children}</RadioContext.Provider>
+    <RadioContext.Provider value={value}>
+      {/* DOM-attached audio is required for reliable iOS playback */}
+      <audio
+        ref={audioRef}
+        preload="none"
+        playsInline
+        // Keep in layout (not display:none) — opacity trick for WebKit
+        className="pointer-events-none fixed top-0 left-0 h-px w-px opacity-0"
+        aria-hidden
+      />
+      {children}
+    </RadioContext.Provider>
   );
 }
 
