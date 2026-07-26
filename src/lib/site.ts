@@ -8,7 +8,7 @@ export const SITE = {
   streamUrl: "https://cast3.my-control-panel.com/proxy/fmheartn/stream",
   whatsapp: "94772175779",
   phones: ["+94 11 2 999 416", "+94 11 2 999 417"],
-  email: "hello@fmheart.lk",
+  email: "info@fmheart.lk",
   address: "No. 128/2b, High Level Road, Kottawa, Sri Lanka",
   social: {
     facebook: "https://facebook.com/fmheartradio",
