@@ -1,0 +1,138 @@
+import { heroSlides as mockSlides } from "@/data/mock";
+import { isFirebaseConfigured } from "@/lib/firebase/client";
+import { mapFirebaseError } from "@/services/articles";
+import type { Article } from "@/types";
+
+const SETTINGS_DOC = "hero";
+
+export type HeroSlideInput = {
+  title: string;
+  excerpt?: string;
+  category: string;
+  image: string;
+  slug: string;
+};
+
+async function tryFirestore() {
+  if (!isFirebaseConfigured()) return null;
+  const { getDb } = await import("@/lib/firebase/client");
+  return getDb();
+}
+
+function normalizeSlides(raw: unknown): Article[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item, i) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Record<string, unknown>;
+      const title = typeof row.title === "string" ? row.title.trim() : "";
+      const image = typeof row.image === "string" ? row.image.trim() : "";
+      const slug = typeof row.slug === "string" ? row.slug.trim() : "";
+      const category =
+        typeof row.category === "string" ? row.category.trim() : "News";
+      if (!title || !image || !slug) return null;
+      const excerpt =
+        typeof row.excerpt === "string" ? row.excerpt.trim() : undefined;
+      return {
+        id: typeof row.id === "string" && row.id ? row.id : `hero-${i + 1}`,
+        title,
+        excerpt: excerpt || undefined,
+        category: category || "News",
+        image,
+        slug,
+        publishedAt:
+          typeof row.publishedAt === "string" && row.publishedAt
+            ? row.publishedAt
+            : "දැන්",
+      } satisfies Article;
+    })
+    .filter((s): s is Article => Boolean(s));
+}
+
+/** Public read — used by homepage HeroSlider */
+export async function getHeroSlides(): Promise<Article[]> {
+  try {
+    const db = await tryFirestore();
+    if (!db) return mockSlides;
+
+    const { doc, getDoc } = await import("firebase/firestore");
+    const snap = await getDoc(doc(db, "settings", SETTINGS_DOC));
+    if (!snap.exists()) return mockSlides;
+
+    const slides = normalizeSlides(snap.data()?.slides);
+    return slides.length > 0 ? slides : mockSlides;
+  } catch (err) {
+    console.warn("[hero] read failed:", err);
+    return mockSlides;
+  }
+}
+
+/** Admin write — requires signed-in admin */
+export async function saveHeroSlides(
+  slides: HeroSlideInput[],
+): Promise<Article[]> {
+  const db = await tryFirestore();
+  if (!db) {
+    throw new Error(
+      "Firebase configured නැහැ. .env.local එකේ Firebase keys දාන්න.",
+    );
+  }
+
+  const cleaned = normalizeSlides(
+    slides.map((s, i) => ({
+      id: `hero-${i + 1}`,
+      title: s.title,
+      excerpt: s.excerpt || "",
+      category: s.category,
+      image: s.image,
+      slug: s.slug,
+      publishedAt: "දැන්",
+    })),
+  );
+
+  if (cleaned.length === 0) {
+    throw new Error("අඩු තරමේ hero slide එකක් ඕන (title, image, slug).");
+  }
+
+  try {
+    const { doc, setDoc } = await import("firebase/firestore");
+    await setDoc(
+      doc(db, "settings", SETTINGS_DOC),
+      {
+        slides: cleaned,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true },
+    );
+    return cleaned;
+  } catch (err) {
+    throw new Error(mapFirebaseError(err));
+  }
+}
+
+export function emptyHeroSlide(): HeroSlideInput {
+  return {
+    title: "",
+    excerpt: "",
+    category: "BREAKING NEWS",
+    image: "",
+    slug: "",
+  };
+}
+
+export function articleToHeroInput(a: {
+  title: string;
+  excerpt?: string;
+  category: string;
+  coverImage?: string;
+  image?: string;
+  slug: string;
+}): HeroSlideInput {
+  return {
+    title: a.title,
+    excerpt: a.excerpt || "",
+    category: a.category,
+    image: a.coverImage || a.image || "",
+    slug: a.slug,
+  };
+}

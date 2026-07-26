@@ -3,22 +3,41 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { heroSlides } from "@/data/mock";
+import { heroSlides as mockSlides } from "@/data/mock";
+import { getHeroSlides } from "@/services/hero";
+import type { Article } from "@/types";
 
 export function HeroSlider() {
+  const [slides, setSlides] = useState<Article[]>(mockSlides);
   const [index, setIndex] = useState(0);
-  const slide = heroSlides[index];
+  const slide = slides[index] ?? slides[0];
 
   useEffect(() => {
+    let cancelled = false;
+    void getHeroSlides().then((items) => {
+      if (!cancelled && items.length > 0) {
+        setSlides(items);
+        setIndex(0);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (slides.length < 2) return;
     const id = setInterval(() => {
-      setIndex((i) => (i + 1) % heroSlides.length);
+      setIndex((i) => (i + 1) % slides.length);
     }, 6500);
     return () => clearInterval(id);
-  }, []);
+  }, [slides.length]);
+
+  if (!slide) return null;
 
   return (
     <section className="relative min-h-[280px] overflow-hidden bg-fh-black md:min-h-[420px] lg:min-h-[480px]">
-      {heroSlides.map((item, i) => (
+      {slides.map((item, i) => (
         <div
           key={item.id}
           className={`absolute inset-0 transition-opacity duration-700 ${
@@ -57,7 +76,7 @@ export function HeroSlider() {
             READ MORE
           </Link>
           <div className="flex gap-2">
-            {heroSlides.map((_, i) => (
+            {slides.map((_, i) => (
               <button
                 key={i}
                 type="button"

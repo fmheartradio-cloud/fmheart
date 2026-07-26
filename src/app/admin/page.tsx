@@ -22,8 +22,15 @@ import {
   getBreakingHeadlines,
   saveBreakingHeadlines,
 } from "@/services/breaking";
+import {
+  articleToHeroInput,
+  emptyHeroSlide,
+  getHeroSlides,
+  saveHeroSlides,
+  type HeroSlideInput,
+} from "@/services/hero";
 import type { CmsArticle, CmsArticleInput, ContentType } from "@/types/cms";
-import { breakingHeadlines as mockHeadlines } from "@/data/mock";
+import { breakingHeadlines as mockHeadlines, heroSlides as mockHero } from "@/data/mock";
 
 const emptyForm: CmsArticleInput = {
   type: "news",
@@ -53,6 +60,11 @@ export default function AdminCmsPage() {
   const [breakingText, setBreakingText] = useState(mockHeadlines.join("\n"));
   const [breakingMsg, setBreakingMsg] = useState<string | null>(null);
   const [breakingBusy, setBreakingBusy] = useState(false);
+  const [heroSlidesForm, setHeroSlidesForm] = useState<HeroSlideInput[]>(
+    mockHero.map(articleToHeroInput),
+  );
+  const [heroMsg, setHeroMsg] = useState<string | null>(null);
+  const [heroBusy, setHeroBusy] = useState(false);
 
   useEffect(() => {
     if (!configured) return;
@@ -75,12 +87,18 @@ export default function AdminCmsPage() {
   }, [user]);
 
   async function refresh() {
-    const [items, breaking] = await Promise.all([
+    const [items, breaking, hero] = await Promise.all([
       listArticles({ status: "all", limit: 50 }),
       getBreakingHeadlines(),
+      getHeroSlides(),
     ]);
     setArticles(items);
     setBreakingText(breaking.join("\n"));
+    setHeroSlidesForm(
+      hero.length > 0
+        ? hero.map(articleToHeroInput)
+        : [emptyHeroSlide(), emptyHeroSlide(), emptyHeroSlide()],
+    );
   }
 
   async function handleSaveBreaking(e: FormEvent) {
@@ -100,6 +118,33 @@ export default function AdminCmsPage() {
     } finally {
       setBreakingBusy(false);
     }
+  }
+
+  async function handleSaveHero(e: FormEvent) {
+    e.preventDefault();
+    setHeroBusy(true);
+    setHeroMsg(null);
+    try {
+      const saved = await saveHeroSlides(heroSlidesForm);
+      setHeroSlidesForm(saved.map(articleToHeroInput));
+      setHeroMsg("Hero posts updated ✓");
+    } catch (err) {
+      setHeroMsg(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setHeroBusy(false);
+    }
+  }
+
+  function updateHeroSlide(index: number, patch: Partial<HeroSlideInput>) {
+    setHeroSlidesForm((prev) =>
+      prev.map((slide, i) => (i === index ? { ...slide, ...patch } : slide)),
+    );
+  }
+
+  function fillHeroFromArticle(index: number, articleId: string) {
+    const article = articles.find((a) => a.id === articleId);
+    if (!article) return;
+    updateHeroSlide(index, articleToHeroInput(article));
   }
 
   async function handleLogin(e: FormEvent) {
@@ -342,6 +387,128 @@ export default function AdminCmsPage() {
             {breakingMsg && (
               <p className="text-sm text-fh-muted">{breakingMsg}</p>
             )}
+          </form>
+
+          <form
+            onSubmit={handleSaveHero}
+            className="space-y-4 bg-white p-5 shadow-sm"
+          >
+            <div>
+              <h2 className="font-heading text-lg font-bold">Hero Posts</h2>
+              <p className="mt-1 text-xs text-fh-muted">
+                Homepage slider — slides 1–3. Published article එකකින් fill
+                කරන්න පුළුවන්, නැත්නම් manually edit කරන්න.
+              </p>
+            </div>
+
+            {heroSlidesForm.map((slide, i) => (
+              <div
+                key={i}
+                className="space-y-2 border border-neutral-200 p-3"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-heading text-sm font-bold">
+                    Slide {i + 1}
+                  </p>
+                  <select
+                    className="max-w-full border border-neutral-300 px-2 py-1.5 text-xs"
+                    defaultValue=""
+                    onChange={(e) => {
+                      if (e.target.value) fillHeroFromArticle(i, e.target.value);
+                      e.target.value = "";
+                    }}
+                  >
+                    <option value="">Fill from article…</option>
+                    {articles
+                      .filter((a) => a.status === "published")
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          [{a.type}] {a.title.slice(0, 60)}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <input
+                  required
+                  placeholder="Title"
+                  value={slide.title}
+                  onChange={(e) =>
+                    updateHeroSlide(i, { title: e.target.value })
+                  }
+                  className="w-full border border-neutral-300 px-3 py-2 text-sm"
+                />
+                <input
+                  placeholder="Excerpt (optional)"
+                  value={slide.excerpt || ""}
+                  onChange={(e) =>
+                    updateHeroSlide(i, { excerpt: e.target.value })
+                  }
+                  className="w-full border border-neutral-300 px-3 py-2 text-sm"
+                />
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <input
+                    required
+                    placeholder="Category"
+                    value={slide.category}
+                    onChange={(e) =>
+                      updateHeroSlide(i, { category: e.target.value })
+                    }
+                    className="w-full border border-neutral-300 px-3 py-2 text-sm"
+                  />
+                  <input
+                    required
+                    placeholder="Slug (article URL slug)"
+                    value={slide.slug}
+                    onChange={(e) =>
+                      updateHeroSlide(i, { slug: e.target.value })
+                    }
+                    className="w-full border border-neutral-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <input
+                  required
+                  placeholder="Image URL"
+                  value={slide.image}
+                  onChange={(e) =>
+                    updateHeroSlide(i, { image: e.target.value })
+                  }
+                  className="w-full border border-neutral-300 px-3 py-2 text-sm"
+                />
+              </div>
+            ))}
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="border border-neutral-300 px-3 py-2 text-sm"
+                onClick={() =>
+                  setHeroSlidesForm((prev) =>
+                    prev.length < 5 ? [...prev, emptyHeroSlide()] : prev,
+                  )
+                }
+              >
+                + Add slide
+              </button>
+              {heroSlidesForm.length > 1 && (
+                <button
+                  type="button"
+                  className="border border-neutral-300 px-3 py-2 text-sm text-fh-muted"
+                  onClick={() =>
+                    setHeroSlidesForm((prev) => prev.slice(0, -1))
+                  }
+                >
+                  Remove last
+                </button>
+              )}
+              <button
+                type="submit"
+                disabled={heroBusy}
+                className="bg-fh-red px-5 py-2.5 font-heading text-sm font-bold text-white disabled:opacity-60"
+              >
+                {heroBusy ? "Saving…" : "Save Hero Posts"}
+              </button>
+            </div>
+            {heroMsg && <p className="text-sm text-fh-muted">{heroMsg}</p>}
           </form>
 
         <form onSubmit={handleSave} className="space-y-3 bg-white p-5 shadow-sm">
