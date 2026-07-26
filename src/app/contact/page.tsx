@@ -33,7 +33,7 @@ export default function ContactPage() {
           Contact
         </p>
         <h1 className="mt-2 font-heading text-3xl font-extrabold md:text-4xl">
-          අප අමතන්න
+          අපව අමතන්න
         </h1>
         <p className="mt-2 text-fh-muted">
           Advertising, song requests, partnerships — message එකක් යවන්න.
