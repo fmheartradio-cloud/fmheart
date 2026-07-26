@@ -55,7 +55,7 @@ export default async function NewsPage() {
                     {article.category}
                   </span>
                 </div>
-                <h2 className="mt-3 font-heading text-lg font-bold leading-snug group-hover:text-fh-red">
+                <h2 className="font-news-headline mt-3 text-lg leading-snug group-hover:text-fh-red">
                   {article.title}
                 </h2>
                 <p className="mt-1 line-clamp-2 font-article text-sm text-fh-muted">

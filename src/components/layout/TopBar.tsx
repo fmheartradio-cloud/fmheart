@@ -44,7 +44,7 @@ export function TopBar() {
           BREAKING
         </span>
         <div className="relative min-w-0 flex-1 overflow-hidden">
-          <div className="animate-ticker flex w-max gap-12 whitespace-nowrap font-sans text-xs md:text-sm">
+          <div className="animate-ticker flex w-max gap-12 whitespace-nowrap font-news-headline text-xs md:text-sm">
             {loop.map((item, i) => (
               <Link
                 key={`${item.href}-${i}`}

@@ -67,7 +67,7 @@ export function NewsGrid({ title, articles, viewAllHref = "#" }: NewsGridProps) 
                     {article.category}
                   </span>
                 </div>
-                <h3 className="mt-2.5 font-heading text-[15px] font-bold leading-snug text-fh-ink transition group-hover:text-fh-red md:text-base">
+                <h3 className="font-news-headline mt-2.5 text-[15px] leading-snug text-fh-ink transition group-hover:text-fh-red md:text-base">
                   {article.title}
                 </h3>
                 <time className="mt-1 block text-xs text-fh-muted">

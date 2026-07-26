@@ -93,7 +93,7 @@ export default async function NewsArticlePage({ params }: Props) {
             <span className="inline-block bg-fh-red px-2 py-0.5 font-heading text-xs font-bold text-white uppercase">
               {article.category}
             </span>
-            <h1 className="mt-3 font-heading text-3xl font-extrabold leading-snug md:text-4xl">
+            <h1 className="font-news-headline mt-3 text-3xl leading-snug md:text-4xl">
               {article.title}
             </h1>
             <div className="mt-3 flex flex-wrap gap-3 text-xs text-fh-muted">
@@ -180,7 +180,7 @@ export default async function NewsArticlePage({ params }: Props) {
                           sizes="80px"
                         />
                       </div>
-                      <h3 className="font-heading text-sm font-bold leading-snug">
+                      <h3 className="font-news-headline text-sm leading-snug">
                         {item.title}
                       </h3>
                     </Link>
