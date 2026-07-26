@@ -15,7 +15,7 @@ Optional local Python runner under `services/newsbot/` mirrors sources in `sourc
 
 ---
 
-## Sinhala sources (5)
+## Sinhala sources (6)
 
 | Source | Feed / list |
 |--------|-------------|
@@ -24,6 +24,7 @@ Optional local Python runner under `services/newsbot/` mirrors sources in `sourc
 | Ada Derana Sinhala | `https://sinhala.adaderana.lk/rsshotnews.php` |
 | BBC Sinhala | `https://feeds.bbci.co.uk/sinhala/rss.xml` |
 | Lanka eNews | `https://www.lankaenews.com/` → `/news/{id}/si` |
+| Lanka Hot News | `https://www.lankahotnews.net/rss.xml` |
 
 Categories are inferred per article (URL path, RSS tags, keywords) — not a single blanket default.
 

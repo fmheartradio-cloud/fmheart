@@ -274,6 +274,23 @@ def extract_article_body_from_html(html: str, page_url: str) -> str:
         if len(joined) >= MIN_BODY_CHARS:
             return cap_body(joined)
 
+    if "lankahotnews.net" in host:
+        body_block = re.search(
+            r'<div[^>]+class=["\'][^"\']*\bpost-body\b[^"\']*\bentry-content\b[^"\']*["\'][^>]*>(.*?)</div>\s*</div>',
+            html,
+            re.I | re.S,
+        )
+        if not body_block:
+            body_block = re.search(
+                r'<div[^>]+class=["\'][^"\']*\bentry-content\b[^"\']*["\'][^>]*>(.*?)</div>',
+                html,
+                re.I | re.S,
+            )
+        if body_block:
+            text = _html_fragment_to_paragraphs(body_block.group(1))
+            if len(text) >= MIN_BODY_CHARS:
+                return cap_body(text)
+
     if "bbc.com" in host or "bbc.co.uk" in host:
         paragraphs = []
         for match in re.finditer(r"(?is)<p[^>]*>(.*?)</p>", html):

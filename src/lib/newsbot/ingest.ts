@@ -58,6 +58,13 @@ export const DEFAULT_NEWS_SOURCES: NewsSource[] = [
     category: "දේශීය",
     active: true,
   },
+  {
+    id: "lankahotnews",
+    name: "Lanka Hot News",
+    rss: "https://www.lankahotnews.net/rss.xml",
+    category: "දේශීය",
+    active: true,
+  },
 ];
 
 type FeedItem = {
@@ -522,6 +529,20 @@ function extractArticleBodyFromHtml(html: string, pageUrl: string): string {
     if (joined.length >= MIN_BODY_CHARS) return capBody(joined);
   }
 
+  if (host.includes("lankahotnews.net")) {
+    const bodyBlock =
+      html.match(
+        /<div[^>]+class=["'][^"']*\bpost-body\b[^"']*\bentry-content\b[^"']*["'][^>]*>([\s\S]*?)<\/div>\s*<\/div>/i,
+      )?.[1] ||
+      html.match(
+        /<div[^>]+class=["'][^"']*\bentry-content\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+      )?.[1];
+    if (bodyBlock) {
+      const text = htmlFragmentToParagraphs(bodyBlock);
+      if (text.length >= MIN_BODY_CHARS) return capBody(text);
+    }
+  }
+
   if (host.includes("bbc.com") || host.includes("bbc.co.uk")) {
     const paragraphs = [...html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
       .map((m) => stripInlineHtml(m[1]))
@@ -570,7 +591,7 @@ type ArticlePageData = {
 };
 
 const JUNK_IMAGE_RE =
-  /logo|icon|avatar|pixel|spacer|1x1|tracking|badge|sprite|facebook|instagram|youtube|twitter|instagrame/i;
+  /logo|icon|avatar|pixel|spacer|1x1|tracking|badge|sprite|facebook|instagram|youtube|twitter|instagrame|advertising\.gif|lankahotnews\+advertising/i;
 
 function isJunkImageUrl(url: string): boolean {
   return JUNK_IMAGE_RE.test(url);

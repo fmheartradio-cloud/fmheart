@@ -26,6 +26,11 @@ sources:
     list_url: https://www.lankaenews.com/
     category: දේශීය
     active: true
+  - id: lankahotnews
+    name: Lanka Hot News
+    rss: https://www.lankahotnews.net/rss.xml
+    category: දේශීය
+    active: true
 
 # Bot writes drafts for admin review (safer for copyright/quality)
 default_status: draft
