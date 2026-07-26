@@ -1,5 +1,9 @@
 import { createHash } from "crypto";
 import { getAdminDb } from "@/lib/firebase/admin";
+import {
+  decodeHtmlEntities,
+  hasUndecodedHtmlEntities,
+} from "@/lib/html-entities";
 import { hasSinhalaNewsText } from "@/lib/sinhala-script";
 
 export type NewsSource = {
@@ -45,15 +49,13 @@ type FeedItem = {
 };
 
 function stripHtml(raw: string): string {
-  return raw
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
+  return decodeHtmlEntities(
+    raw
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\u00a0/g, " "),
+  )
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -85,20 +87,6 @@ function readingTime(body: string): number {
 const NEWSBOT_USER_AGENT = "FMHeartNewsBot/1.0 (+https://fmheart.lk)";
 const MIN_BODY_CHARS = 280;
 const MAX_BODY_CHARS = 10000;
-
-function decodeHtmlEntities(raw: string): string {
-  return raw
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex) =>
-      String.fromCharCode(parseInt(hex, 16)),
-    )
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(Number(dec)));
-}
 
 function unwrapCdata(raw: string): string {
   const trimmed = raw.trim();
@@ -257,7 +245,7 @@ function stripInlineHtml(raw: string): string {
       .replace(/<br\s*\/?>/gi, "\n")
       .replace(/<\/p>/gi, "\n")
       .replace(/<[^>]+>/g, " ")
-      .replace(/\u200c|\u200d|\u00a0/g, " ")
+      .replace(/\u00a0/g, " ")
       .replace(/[ \t]+\n/g, "\n")
       .replace(/\n{3,}/g, "\n\n")
       .replace(/[ \t]{2,}/g, " "),
@@ -703,10 +691,11 @@ export async function runNewsIngest(options?: {
           const existingBody = String(existingData.body || "").trim();
           const needsCover = !existingCover;
           const needsBody = bodyLooksLikeTitle(existingBody, title);
+          const needsEntityFix = hasUndecodedHtmlEntities(existingBody);
           const updates: Record<string, string | number> = {};
 
           let pageData: ArticlePageData | null = null;
-          if (item.sourceUrl && (needsCover || needsBody)) {
+          if (item.sourceUrl && (needsCover || needsBody || needsEntityFix)) {
             pageData = await fetchArticlePageData(item.sourceUrl);
           }
 
@@ -731,6 +720,19 @@ export async function runNewsIngest(options?: {
               pageData?.body &&
               !bodyLooksLikeTitle(pageData.body, title) &&
               pageData.body.length > existingBody.length
+            ) {
+              updates.body = capBody(pageData.body);
+              updates.readingTimeMin = readingTime(String(updates.body));
+            }
+          } else if (needsEntityFix) {
+            const fixedBody = decodeHtmlEntities(existingBody);
+            if (fixedBody !== existingBody) {
+              updates.body = capBody(fixedBody);
+              updates.readingTimeMin = readingTime(String(updates.body));
+            } else if (
+              pageData?.body &&
+              !bodyLooksLikeTitle(pageData.body, title) &&
+              pageData.body.length >= existingBody.length
             ) {
               updates.body = capBody(pageData.body);
               updates.readingTimeMin = readingTime(String(updates.body));

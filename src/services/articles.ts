@@ -1,6 +1,7 @@
 import type { CmsArticle, CmsArticleInput } from "@/types/cms";
 import { gossipNews, latestNews } from "@/data/mock";
 import { isFirebaseConfigured } from "@/lib/firebase/client";
+import { decodeHtmlEntities } from "@/lib/html-entities";
 import { hasSinhalaNewsText } from "@/lib/sinhala-script";
 
 function slugify(text: string): string {
@@ -32,6 +33,15 @@ function normalizeSlugParam(raw: string): string {
 function readingTime(body: string): number {
   const words = body.trim().split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.ceil(words / 180));
+}
+
+function normalizeArticleText(article: CmsArticle): CmsArticle {
+  return {
+    ...article,
+    title: decodeHtmlEntities(article.title),
+    excerpt: decodeHtmlEntities(article.excerpt),
+    body: decodeHtmlEntities(article.body),
+  };
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -185,7 +195,7 @@ export async function listArticles(options?: {
       }
 
       let items = snap.docs.map(
-        (d) => ({ id: d.id, ...d.data() }) as CmsArticle,
+        (d) => normalizeArticleText({ id: d.id, ...d.data() } as CmsArticle),
       );
       if (type) items = items.filter((a) => a.type === type);
       items = filterPublicNews(items, status);
@@ -235,7 +245,10 @@ export async function getArticleBySlug(rawSlug: string): Promise<CmsArticle | nu
           const snap = await withTimeout(getDocs(q), 10000, "Firestore read");
           if (!snap.empty) {
             const d = snap.docs[0]!;
-            const article = { id: d.id, ...d.data() } as CmsArticle;
+            const article = normalizeArticleText({
+              id: d.id,
+              ...d.data(),
+            } as CmsArticle);
             if (
               article.type === "news" &&
               !hasSinhalaNewsText(article.title, article.excerpt)

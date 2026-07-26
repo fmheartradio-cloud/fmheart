@@ -128,7 +128,7 @@ export default async function NewsArticlePage({ params }: Props) {
               className="mt-6 min-h-[90px]"
             />
 
-            <div className="prose-article mt-6 space-y-4 font-article text-lg leading-8 text-fh-ink whitespace-pre-line">
+            <div className="prose-article mt-6 space-y-4 text-justify font-article text-lg leading-8 text-fh-ink whitespace-pre-line">
               {article.body}
             </div>
 

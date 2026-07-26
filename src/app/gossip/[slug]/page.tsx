@@ -90,7 +90,7 @@ export default async function GossipArticlePage({ params }: Props) {
           label="Gossip In-Article"
           className="mt-6 min-h-[90px]"
         />
-        <div className="mt-6 font-article text-lg leading-8 whitespace-pre-line">
+        <div className="prose-article mt-6 text-justify font-article text-lg leading-8 whitespace-pre-line">
           {article.body}
         </div>
       </main>
