@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import localFont from "next/font/local";
 import {
   Abhaya_Libre,
   Gemunu_Libre,
@@ -38,13 +37,6 @@ const yaldevi = Yaldevi({
   subsets: ["sinhala", "latin"],
   weight: ["400", "500", "600", "700"],
   display: "swap",
-});
-
-const isiDavasa = localFont({
-  src: "../../public/fonts/IsiDavasa.ttf",
-  variable: "--font-davasa",
-  display: "swap",
-  weight: "400 800",
 });
 
 export const metadata: Metadata = {
@@ -129,7 +121,7 @@ export default function RootLayout({
   return (
     <html
       lang="si"
-      className={`${notoSansSinhala.variable} ${gemunuLibre.variable} ${abhayaLibre.variable} ${yaldevi.variable} ${isiDavasa.variable} h-full`}
+      className={`${notoSansSinhala.variable} ${gemunuLibre.variable} ${abhayaLibre.variable} ${yaldevi.variable} h-full`}
     >
       <body className="min-h-full bg-white font-sans text-fh-ink antialiased">
         <OrganizationJsonLd />

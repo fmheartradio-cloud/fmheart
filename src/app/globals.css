@@ -8,14 +8,6 @@
   font-display: swap;
 }
 
-@font-face {
-  font-family: "IsiDavasa";
-  src: url("/fonts/IsiDavasa.ttf") format("truetype");
-  font-weight: 400 800;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
   --fh-red: #d50000;
   --fh-red-dark: #b71c1c;
@@ -43,7 +35,6 @@
   --font-article: var(--font-article);
   --font-feature: var(--font-feature);
   --font-sigiri: "AF Sigiri", var(--font-heading), sans-serif;
-  --font-davasa: var(--font-davasa);
 }
 
 * {
@@ -109,8 +100,4 @@ body {
 
 .font-sigiri {
   font-family: "AF Sigiri", var(--font-heading), sans-serif;
-}
-
-.font-davasa {
-  font-family: var(--font-davasa), "IsiDavasa", sans-serif !important;
 }
