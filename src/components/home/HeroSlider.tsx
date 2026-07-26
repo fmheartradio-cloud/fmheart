@@ -4,26 +4,17 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { heroSlides as mockSlides } from "@/data/mock";
-import { getHeroSlides } from "@/services/hero";
 import type { Article } from "@/types";
 
-export function HeroSlider() {
-  const [slides, setSlides] = useState<Article[]>(mockSlides);
+type HeroSliderProps = {
+  slides?: Article[];
+};
+
+export function HeroSlider({ slides: initialSlides }: HeroSliderProps) {
+  const slides =
+    initialSlides && initialSlides.length > 0 ? initialSlides : mockSlides;
   const [index, setIndex] = useState(0);
   const slide = slides[index] ?? slides[0];
-
-  useEffect(() => {
-    let cancelled = false;
-    void getHeroSlides().then((items) => {
-      if (!cancelled && items.length > 0) {
-        setSlides(items);
-        setIndex(0);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (slides.length < 2) return;

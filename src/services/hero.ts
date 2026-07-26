@@ -1,7 +1,10 @@
 import { heroSlides as mockSlides } from "@/data/mock";
 import { isFirebaseConfigured } from "@/lib/firebase/client";
-import { mapFirebaseError } from "@/services/articles";
+import { listArticles, mapFirebaseError } from "@/services/articles";
 import type { Article } from "@/types";
+import type { CmsArticle } from "@/types/cms";
+
+const HERO_NEWS_LIMIT = 5;
 
 const SETTINGS_DOC = "hero";
 
@@ -49,8 +52,39 @@ function normalizeSlides(raw: unknown): Article[] {
   return out;
 }
 
-/** Public read — used by homepage HeroSlider */
-export async function getHeroSlides(): Promise<Article[]> {
+/** Map a published news article to a homepage hero slide. */
+export function cmsToHeroSlide(article: CmsArticle): Article {
+  return {
+    id: article.id,
+    title: article.title,
+    excerpt: article.excerpt || undefined,
+    category: article.category,
+    image: article.coverImage || "/logo/fmheart-cover.png",
+    publishedAt: article.publishedAt
+      ? new Date(article.publishedAt).toLocaleString("si-LK")
+      : "දැන්",
+    slug: article.slug,
+  };
+}
+
+/** Homepage hero — 5 newest published news (Sinhala filter via listArticles). */
+export async function getLatestNewsHeroSlides(): Promise<Article[]> {
+  try {
+    const articles = await listArticles({
+      type: "news",
+      status: "published",
+      limit: HERO_NEWS_LIMIT,
+    });
+    if (articles.length === 0) return mockSlides;
+    return articles.map(cmsToHeroSlide);
+  } catch (err) {
+    console.warn("[hero] latest news read failed:", err);
+    return mockSlides;
+  }
+}
+
+/** Admin CMS read — Firestore settings/hero (homepage ignores this). */
+export async function getCmsHeroSlides(): Promise<Article[]> {
   try {
     const db = await tryFirestore();
     if (!db) return mockSlides;
@@ -62,9 +96,14 @@ export async function getHeroSlides(): Promise<Article[]> {
     const slides = normalizeSlides(snap.data()?.slides);
     return slides.length > 0 ? slides : mockSlides;
   } catch (err) {
-    console.warn("[hero] read failed:", err);
+    console.warn("[hero] CMS read failed:", err);
     return mockSlides;
   }
+}
+
+/** @deprecated Use getLatestNewsHeroSlides (public) or getCmsHeroSlides (admin). */
+export async function getHeroSlides(): Promise<Article[]> {
+  return getLatestNewsHeroSlides();
 }
 
 /** Admin write — requires signed-in admin */

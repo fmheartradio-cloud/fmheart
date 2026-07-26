@@ -16,6 +16,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { videos } from "@/data/mock";
 import { adSlot } from "@/lib/ads";
 import { cmsToCard, listArticles } from "@/services/articles";
+import { cmsToHeroSlide } from "@/services/hero";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -26,6 +27,7 @@ export default async function HomePage() {
     listArticles({ type: "gossip", status: "published", limit: 8 }),
   ]);
 
+  const heroSlides = news.slice(0, 5).map(cmsToHeroSlide);
   const newsCards = news.map(cmsToCard);
   const gossipCards = gossip.map(cmsToCard);
   const mostReadCards = news.slice(0, 5).map((a) => ({
@@ -45,7 +47,7 @@ export default async function HomePage() {
       <main className="overflow-x-hidden">
         <div className="mx-auto w-full max-w-7xl px-3 md:px-4">
           <div className="grid w-full lg:grid-cols-[1fr_320px]">
-            <HeroSlider />
+            <HeroSlider slides={heroSlides} />
             <div className="min-h-[320px] w-full min-w-0 lg:min-h-full">
               <LiveRadioPlayer />
             </div>

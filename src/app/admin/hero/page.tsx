@@ -5,7 +5,7 @@ import { listArticles } from "@/services/articles";
 import {
   articleToHeroInput,
   emptyHeroSlide,
-  getHeroSlides,
+  getCmsHeroSlides,
   saveHeroSlides,
   type HeroSlideInput,
 } from "@/services/hero";
@@ -23,7 +23,7 @@ export default function AdminHeroPage() {
   useEffect(() => {
     void Promise.all([
       listArticles({ status: "all", limit: 50 }),
-      getHeroSlides(),
+      getCmsHeroSlides(),
     ]).then(([items, hero]) => {
       setArticles(items);
       setHeroSlidesForm(
@@ -68,7 +68,8 @@ export default function AdminHeroPage() {
           Hero Posts
         </h1>
         <p className="mt-1 text-sm text-fh-muted">
-          Homepage slider. Published article එකකින් fill කරන්න පුළුවන්.
+          Homepage slider දැන් නවතම published news 5 ස්වයංක්‍රීයව පෙන්වයි.
+          මෙහි slides CMS backup / legacy — public homepage එක ignore කරයි.
         </p>
       </div>
 

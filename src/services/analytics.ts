@@ -1,6 +1,6 @@
 import { listArticles } from "@/services/articles";
 import { getBreakingHeadlines } from "@/services/breaking";
-import { getHeroSlides } from "@/services/hero";
+import { getLatestNewsHeroSlides } from "@/services/hero";
 import type { CmsArticle } from "@/types/cms";
 
 export type CmsOverviewStats = {
@@ -28,7 +28,7 @@ export async function getCmsOverviewStats(): Promise<CmsOverviewStats> {
   const [articles, breaking, hero] = await Promise.all([
     listArticles({ status: "all", limit: 100 }),
     getBreakingHeadlines(),
-    getHeroSlides(),
+    getLatestNewsHeroSlides(),
   ]);
 
   const published = articles.filter((a) => a.status === "published");
