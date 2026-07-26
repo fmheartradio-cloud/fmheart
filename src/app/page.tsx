@@ -2,6 +2,7 @@ import { AdSenseUnit } from "@/components/ads/AdSenseUnit";
 import { AdvertiseWidget } from "@/components/home/AdvertiseWidget";
 import { BrandPromo } from "@/components/home/BrandPromo";
 import { CategoryIcons } from "@/components/home/CategoryIcons";
+import { HeaderPromo } from "@/components/home/HeaderPromo";
 import { HeroSlider } from "@/components/home/HeroSlider";
 import { LiveRadioPlayer } from "@/components/home/LiveRadioPlayer";
 import { MidBannerAd } from "@/components/home/MidBannerAd";
@@ -51,11 +52,15 @@ export default async function HomePage() {
           </div>
 
           <div className="w-full py-4 md:py-6">
-            <AdSenseUnit
-              slot={adSlot("header")}
-              label="Header Banner"
-              className="w-full min-h-[90px]"
-            />
+            {adSlot("header") ? (
+              <AdSenseUnit
+                slot={adSlot("header")}
+                label="Header Banner"
+                className="w-full min-h-[90px]"
+              />
+            ) : (
+              <HeaderPromo />
+            )}
           </div>
 
           <div className="grid w-full gap-8 pb-8 lg:grid-cols-[1fr_300px]">

@@ -6,15 +6,16 @@ import { Logo } from "@/components/ui/Logo";
 import { useRadio } from "@/context/RadioProvider";
 import { useUi } from "@/context/UiProvider";
 import { navLinks } from "@/data/mock";
+import { SITE } from "@/lib/site";
 
 export function Header() {
   const { menuOpen, setMenuOpen, toggleMenu } = useUi();
   const [searchOpen, setSearchOpen] = useState(false);
-  const { isPlaying, isLoading, toggle } = useRadio();
+  const { isPlaying, isLoading, toggle, meta } = useRadio();
 
   return (
     <header className="sticky top-0 z-40 border-b border-neutral-200 bg-white/95 backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-1.5 md:gap-3 md:px-4 md:py-3">
+      <div className="mx-auto flex max-w-7xl items-center gap-2 px-3 py-2 md:gap-4 md:px-4 md:py-3">
         <button
           type="button"
           className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-neutral-200 text-fh-ink md:hidden"
@@ -25,11 +26,37 @@ export function Header() {
           <span className="text-xl leading-none">{menuOpen ? "✕" : "☰"}</span>
         </button>
 
-        <div className="flex min-w-0 flex-1 items-center md:flex-none">
+        <div className="flex min-w-0 shrink-0 items-center">
           <Logo variant="tagline" />
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 md:gap-3">
+        {/* Desktop: fill empty middle with tagline + now playing */}
+        <div className="hidden min-w-0 flex-1 items-center justify-center px-4 lg:flex">
+          <div className="max-w-xl text-center">
+            <p className="font-feature text-sm font-semibold tracking-wide text-fh-ink">
+              {SITE.taglineSi}
+            </p>
+            <p className="mt-0.5 truncate text-xs text-fh-muted">
+              <span className="font-semibold text-fh-red">
+                {isPlaying ? "ON AIR" : "NOW PLAYING"}
+              </span>
+              <span className="mx-1.5 text-neutral-300">·</span>
+              <span>
+                {meta.song}
+                {meta.artist ? ` — ${meta.artist}` : ""}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div className="ml-auto flex shrink-0 items-center gap-2 md:gap-3">
+          <Link
+            href="/advertise"
+            className="hidden rounded-md border border-neutral-200 px-3 py-2 font-heading text-xs font-bold tracking-wide text-fh-ink transition hover:border-fh-red hover:text-fh-red xl:inline-flex"
+          >
+            ADVERTISE
+          </Link>
+
           <button
             type="button"
             onClick={() => void toggle()}
