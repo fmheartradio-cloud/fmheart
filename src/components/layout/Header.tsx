@@ -9,23 +9,13 @@ import { navLinks } from "@/data/mock";
 import { SITE } from "@/lib/site";
 
 export function Header() {
-  const { menuOpen, setMenuOpen, toggleMenu } = useUi();
+  const { menuOpen, setMenuOpen } = useUi();
   const [searchOpen, setSearchOpen] = useState(false);
   const { isPlaying, isLoading, toggle, meta } = useRadio();
 
   return (
     <header className="sticky top-0 z-40 border-b border-neutral-200 bg-white/95 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center gap-2 px-3 py-2 md:gap-4 md:px-4 md:py-3">
-        <button
-          type="button"
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-neutral-200 text-fh-ink md:hidden"
-          aria-label="Menu"
-          aria-expanded={menuOpen}
-          onClick={toggleMenu}
-        >
-          <span className="text-xl leading-none">{menuOpen ? "✕" : "☰"}</span>
-        </button>
-
         <div className="flex min-w-0 shrink-0 items-center">
           <Logo variant="tagline" />
         </div>
