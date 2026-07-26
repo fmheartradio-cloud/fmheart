@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 
 from fetch_rss import fetch_rss
 from firebase_client import save_draft
+from category import infer_news_category
 
 ROOT = Path(__file__).resolve().parent
 # Load repo .env.local if present (optional)
@@ -60,7 +61,16 @@ def main() -> int:
 
         for entry in entries:
             entry["source"] = name
-            entry["category"] = src.get("category") or "දේශීය"
+            entry["sourceId"] = str(src.get("id") or "")
+            entry["sourceDefaultCategory"] = str(src.get("category") or "දේශීය")
+            entry["category"] = infer_news_category(
+                source_id=str(src.get("id") or ""),
+                source_default_category=str(src.get("category") or "දේශීය"),
+                source_url=str(entry.get("sourceUrl") or ""),
+                title=str(entry.get("title") or ""),
+                excerpt=str(entry.get("excerpt") or ""),
+                rss_categories=entry.get("rssCategories") or [],
+            )
             entry["status"] = status
             entry["tags"] = [name, entry["category"]]
             try:

@@ -160,6 +160,34 @@ def save_draft(item: dict[str, Any]) -> str | None:
 
                 updates["body"] = cap_body(fuller_body)
                 updates["readingTimeMin"] = _reading_time(updates["body"])
+
+        from category import (
+            infer_news_category,
+            merge_ingest_tags,
+            should_upgrade_ingested_category,
+        )
+
+        source_default = str(item.get("sourceDefaultCategory") or "දේශීය")
+        inferred_category = infer_news_category(
+            source_id=str(item.get("sourceId") or ""),
+            source_default_category=source_default,
+            source_url=url,
+            title=title,
+            excerpt=str(item.get("excerpt") or ""),
+            rss_categories=item.get("rssCategories") or [],
+        )
+        existing_category = str(existing.get("category") or "").strip()
+        if should_upgrade_ingested_category(
+            existing_category, source_default, inferred_category
+        ):
+            updates["category"] = inferred_category
+            updates["tags"] = merge_ingest_tags(
+                existing.get("tags"),
+                str(item.get("source") or "Unknown"),
+                source_default,
+                inferred_category,
+            )
+
         if updates:
             now = datetime.now(tz=timezone.utc).isoformat()
             updates["updatedAt"] = now

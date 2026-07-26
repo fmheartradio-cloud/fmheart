@@ -5,7 +5,9 @@ export type NewsCategory =
   | "තාක්ෂණය"
   | "සෞඛ්‍ය"
   | "ජීවන රටාව"
+  | "ලෝක පුවත්"
   | "විදේශීය"
+  | "ජාත්‍යන්තර"
   | "දේශීය";
 
 export type GossipCategory =

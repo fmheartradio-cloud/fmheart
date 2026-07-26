@@ -350,6 +350,11 @@ def fetch_rss(url: str, limit: int = 8) -> list[dict[str, Any]]:
         if not title:
             continue
         cover = _first_image(entry, feed_base)
+        rss_categories = [
+            str(tag.get("term") or tag.get("label") or "").strip()
+            for tag in (entry.get("tags") or [])
+            if str(tag.get("term") or tag.get("label") or "").strip()
+        ]
         page_data: dict[str, str] | None = None
         if link and (not cover or is_body_too_short(body, title)):
             page_data = fetch_article_page_data(link)
@@ -366,6 +371,7 @@ def fetch_rss(url: str, limit: int = 8) -> list[dict[str, Any]]:
                 "excerpt": summary[:400] if summary else title,
                 "body": cap_body(body)[:MAX_BODY_CHARS],
                 "coverImage": cover,
+                "rssCategories": rss_categories,
             }
         )
     return items

@@ -4,6 +4,11 @@ import {
   decodeHtmlEntities,
   hasUndecodedHtmlEntities,
 } from "@/lib/html-entities";
+import {
+  inferNewsCategory,
+  mergeIngestTags,
+  shouldUpgradeIngestedCategory,
+} from "@/lib/newsbot/category";
 import { hasSinhalaNewsText } from "@/lib/sinhala-script";
 
 export type NewsSource = {
@@ -44,6 +49,7 @@ type FeedItem = {
   excerpt: string;
   body: string;
   coverImage: string;
+  rssCategories: string[];
   /** True when the article HTML page was fetched successfully. */
   pageFetched?: boolean;
 };
@@ -149,6 +155,29 @@ function extractItemLink(block: string): string {
   if (guid) return normalizeArticleUrl(stripHtml(guid));
 
   return "";
+}
+
+function extractRssCategories(block: string): string[] {
+  const categories: string[] = [];
+  for (const match of block.matchAll(/<category[^>]*>([\s\S]*?)<\/category>/gi)) {
+    const value = stripHtml(unwrapCdata(match[1])).trim();
+    if (value) categories.push(value);
+  }
+  return categories;
+}
+
+function inferItemCategory(
+  src: NewsSource,
+  item: Pick<FeedItem, "sourceUrl" | "title" | "excerpt" | "rssCategories">,
+): string {
+  return inferNewsCategory({
+    sourceId: src.id,
+    sourceDefaultCategory: src.category,
+    sourceUrl: item.sourceUrl,
+    title: item.title,
+    excerpt: item.excerpt,
+    rssCategories: item.rssCategories,
+  });
 }
 
 function xmlTagInner(block: string, tag: string): string {
@@ -657,6 +686,7 @@ function parseRssItems(xml: string, limit: number): FeedItem[] {
       excerpt: (description || title).slice(0, 400),
       body,
       coverImage: firstImageFromXml(chunk, link, feedBase),
+      rssCategories: extractRssCategories(chunk),
     });
   }
   return items;
@@ -716,6 +746,7 @@ export type IngestResult = {
   created: number;
   skipped: number;
   backfilled: number;
+  categoriesUpdated: number;
   error?: string;
 };
 
@@ -757,6 +788,7 @@ export async function runNewsIngest(options?: {
       created: 0,
       skipped: 0,
       backfilled: 0,
+      categoriesUpdated: 0,
     };
     try {
       const items = await fetchRss(src.rss, maxPerSource);
@@ -785,7 +817,7 @@ export async function runNewsIngest(options?: {
           const needsEntityFix = hasUndecodedHtmlEntities(existingBody);
           const adaCoverUpgrade =
             Boolean(existingCover) && isAdaHost(item.sourceUrl);
-          const updates: Record<string, string | number> = {};
+          const updates: Record<string, string | number | string[]> = {};
 
           let pageData: ArticlePageData | null = null;
           if (
@@ -851,10 +883,29 @@ export async function runNewsIngest(options?: {
             }
           }
 
+          const inferredCategory = inferItemCategory(src, item);
+          const existingCategory = String(existingData.category || "").trim();
+          if (
+            shouldUpgradeIngestedCategory(
+              existingCategory,
+              src.category,
+              inferredCategory,
+            )
+          ) {
+            updates.category = inferredCategory;
+            updates.tags = mergeIngestTags(
+              existingData.tags,
+              src.name,
+              src.category,
+              inferredCategory,
+            );
+          }
+
           if (Object.keys(updates).length > 0) {
             updates.updatedAt = new Date().toISOString();
             await existing.ref.update(updates);
             row.backfilled += 1;
+            if ("category" in updates) row.categoriesUpdated += 1;
           }
           row.skipped += 1;
           continue;
@@ -870,6 +921,7 @@ export async function runNewsIngest(options?: {
         }
 
         const body = resolveArticleBody(item, title);
+        const category = inferItemCategory(src, item);
 
         const now = new Date().toISOString();
         const ref = await db.collection("articles").add({
@@ -878,11 +930,11 @@ export async function runNewsIngest(options?: {
           slug: slugify(title),
           excerpt: item.excerpt || title,
           body,
-          category: src.category,
+          category,
           coverImage: item.coverImage || "",
           author: `FM Heart · ${src.name}`,
           status: "draft",
-          tags: [src.name, src.category],
+          tags: [src.name, category],
           readingTimeMin: readingTime(body),
           views: 0,
           createdAt: now,
