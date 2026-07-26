@@ -5,6 +5,7 @@ import {
   deleteArticle,
   listArticles,
   saveArticle,
+  setArticleStatus,
   slugify,
 } from "@/services/articles";
 import type { CmsArticle, CmsArticleInput, ContentType } from "@/types/cms";
@@ -20,6 +21,7 @@ const emptyForm: CmsArticleInput = {
   author: "FM Heart Desk",
   status: "published",
   tags: [],
+  ingestedBy: "manual",
 };
 
 export default function AdminArticlesPage() {
@@ -29,11 +31,17 @@ export default function AdminArticlesPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tagInput, setTagInput] = useState("");
+  const [filter, setFilter] = useState<"all" | "draft" | "published">("all");
 
   async function refresh() {
-    const items = await listArticles({ status: "all", limit: 50 });
+    const items = await listArticles({ status: "all", limit: 80 });
     setArticles(items);
   }
+
+  const visible = articles.filter((a) =>
+    filter === "all" ? true : a.status === filter,
+  );
+  const draftCount = articles.filter((a) => a.status === "draft").length;
 
   useEffect(() => {
     void refresh();
@@ -78,6 +86,10 @@ export default function AdminArticlesPage() {
     setForm({
       type: article.type,
       title: article.title,
+      source: article.source,
+      sourceUrl: article.sourceUrl,
+      sourceHash: article.sourceHash,
+      ingestedBy: article.ingestedBy ?? "manual",
       slug: article.slug,
       excerpt: article.excerpt,
       body: article.body,
@@ -100,8 +112,31 @@ export default function AdminArticlesPage() {
           Articles
         </h1>
         <p className="mt-1 text-sm text-fh-muted">
-          Create and edit news & gossip posts.
+          Manual posts + newsbot drafts. Bot items stay draft until you Publish.
+          {draftCount > 0 ? ` (${draftCount} drafts waiting)` : ""}
         </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {(
+            [
+              ["all", "All"],
+              ["draft", "Drafts"],
+              ["published", "Published"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setFilter(key)}
+              className={`px-3 py-1.5 font-heading text-xs font-bold ${
+                filter === key
+                  ? "bg-fh-red text-white"
+                  : "bg-fh-surface text-fh-ink"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
@@ -238,10 +273,11 @@ export default function AdminArticlesPage() {
 
         <div className="border border-neutral-200 bg-white p-5">
           <h2 className="font-heading text-lg font-bold">
-            All articles ({articles.length})
+            Articles ({visible.length}
+            {filter !== "all" ? ` · ${filter}` : ""})
           </h2>
           <ul className="mt-4 divide-y divide-neutral-100">
-            {articles.map((a) => (
+            {visible.map((a) => (
               <li
                 key={a.id}
                 className="flex items-start justify-between gap-3 py-3"
@@ -251,34 +287,67 @@ export default function AdminArticlesPage() {
                     {a.title}
                   </p>
                   <p className="text-xs text-fh-muted">
-                    {a.type} · {a.status} · {a.category} · {a.views || 0} views
+                    {a.type} · {a.status} · {a.category}
+                    {a.ingestedBy === "newsbot" ? " · bot" : ""}
+                    {a.source ? ` · ${a.source}` : ""} · {a.views || 0} views
                   </p>
+                  {a.sourceUrl ? (
+                    <a
+                      href={a.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-fh-red hover:underline"
+                    >
+                      Source link
+                    </a>
+                  ) : null}
                 </div>
-                <div className="flex shrink-0 gap-2 text-xs">
-                  <button
-                    type="button"
-                    className="text-fh-red"
-                    onClick={() => startEdit(a)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="text-neutral-500"
-                    onClick={async () => {
-                      if (!confirm("Delete?")) return;
-                      try {
-                        await deleteArticle(a.id);
-                        await refresh();
-                      } catch (err) {
-                        setMessage(
-                          err instanceof Error ? err.message : "Delete failed",
-                        );
-                      }
-                    }}
-                  >
-                    Del
-                  </button>
+                <div className="flex shrink-0 flex-col items-end gap-1 text-xs">
+                  {a.status === "draft" ? (
+                    <button
+                      type="button"
+                      className="font-bold text-fh-red"
+                      onClick={async () => {
+                        try {
+                          await setArticleStatus(a.id, "published");
+                          setMessage("Published ✓");
+                          await refresh();
+                        } catch (err) {
+                          setMessage(
+                            err instanceof Error ? err.message : "Publish failed",
+                          );
+                        }
+                      }}
+                    >
+                      Publish
+                    </button>
+                  ) : null}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="text-fh-red"
+                      onClick={() => startEdit(a)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="text-neutral-500"
+                      onClick={async () => {
+                        if (!confirm("Delete?")) return;
+                        try {
+                          await deleteArticle(a.id);
+                          await refresh();
+                        } catch (err) {
+                          setMessage(
+                            err instanceof Error ? err.message : "Delete failed",
+                          );
+                        }
+                      }}
+                    >
+                      Del
+                    </button>
+                  </div>
                 </div>
               </li>
             ))}

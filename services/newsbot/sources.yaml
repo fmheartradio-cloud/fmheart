@@ -1,0 +1,22 @@
+# RSS-only Phase 1. Prefer official feeds; no HTML scrape.
+# Disable a source with active: false
+sources:
+  - id: ada-lk
+    name: Ada
+    rss: https://www.ada.lk/rss/latest_news/1
+    category: දේශීය
+    active: true
+  - id: adaderana
+    name: Ada Derana
+    rss: https://www.adaderana.lk/rss.php
+    category: දේශීය
+    active: true
+  - id: bbc-sinhala
+    name: BBC Sinhala
+    rss: https://feeds.bbci.co.uk/sinhala/rss.xml
+    category: ජාත්‍යන්තර
+    active: true
+
+# Bot writes drafts for admin review (safer for copyright/quality)
+default_status: draft
+max_per_source: 8

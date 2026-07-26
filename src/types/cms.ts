@@ -21,6 +21,11 @@ export interface CmsArticle {
   publishedAt: string | null;
   seoTitle?: string;
   seoDescription?: string;
+  /** News ingestion (auto bot) */
+  source?: string;
+  sourceUrl?: string;
+  sourceHash?: string;
+  ingestedBy?: "manual" | "newsbot";
 }
 
 export interface CmsArticleInput {
@@ -36,4 +41,8 @@ export interface CmsArticleInput {
   tags: string[];
   seoTitle?: string;
   seoDescription?: string;
+  source?: string;
+  sourceUrl?: string;
+  sourceHash?: string;
+  ingestedBy?: "manual" | "newsbot";
 }

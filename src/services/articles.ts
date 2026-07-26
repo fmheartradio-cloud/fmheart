@@ -292,6 +292,10 @@ export async function saveArticle(
     seoDescription: input.seoDescription?.trim() || input.excerpt.trim(),
     updatedAt: nowIso,
     publishedAt: input.status === "published" ? nowIso : null,
+    ingestedBy: input.ingestedBy ?? "manual",
+    ...(input.source ? { source: input.source.trim() } : {}),
+    ...(input.sourceUrl ? { sourceUrl: input.sourceUrl.trim() } : {}),
+    ...(input.sourceHash ? { sourceHash: input.sourceHash.trim() } : {}),
   };
 
   try {
@@ -321,6 +325,29 @@ export async function saveArticle(
       createdAt: nowIso,
       ...payload,
     } as CmsArticle;
+  } catch (err) {
+    throw new Error(mapFirebaseError(err));
+  }
+}
+
+export async function setArticleStatus(
+  id: string,
+  status: "draft" | "published" | "archived",
+): Promise<void> {
+  const db = await tryFirestore();
+  if (!db) throw new Error("Firebase configured නැහැ.");
+  const { doc, updateDoc } = await import("firebase/firestore");
+  const nowIso = new Date().toISOString();
+  try {
+    await withTimeout(
+      updateDoc(doc(db, "articles", id), {
+        status,
+        updatedAt: nowIso,
+        ...(status === "published" ? { publishedAt: nowIso } : {}),
+      }),
+      12000,
+      "Firestore status",
+    );
   } catch (err) {
     throw new Error(mapFirebaseError(err));
   }
