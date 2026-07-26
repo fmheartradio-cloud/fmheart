@@ -40,6 +40,8 @@ type FeedItem = {
   excerpt: string;
   body: string;
   coverImage: string;
+  /** True when the article HTML page was fetched successfully. */
+  pageFetched?: boolean;
 };
 
 function stripHtml(raw: string): string {
@@ -83,8 +85,6 @@ function readingTime(body: string): number {
 const NEWSBOT_USER_AGENT = "FMHeartNewsBot/1.0 (+https://fmheart.lk)";
 const MIN_BODY_CHARS = 280;
 const MAX_BODY_CHARS = 10000;
-/** Bodies at or above this length are treated as admin-edited / full — skip backfill. */
-const ADMIN_BODY_MIN_CHARS = 500;
 
 function decodeHtmlEntities(raw: string): string {
   return raw
@@ -273,6 +273,9 @@ function htmlFragmentToParagraphs(fragment: string): string {
 
   const paragraphs: string[] = [];
   for (const match of html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)) {
+    const tag = match[0];
+    if (/\breco-body\b/i.test(tag)) continue;
+    if (/\badsbyvli\b/i.test(match[1])) continue;
     const text = stripInlineHtml(match[1]);
     if (text.length >= 20 && !/^Reply To:/i.test(text)) {
       paragraphs.push(text);
@@ -282,6 +285,30 @@ function htmlFragmentToParagraphs(fragment: string): string {
     return paragraphs.join("\n\n");
   }
   return stripInlineHtml(html);
+}
+
+/** Slice HTML from an opening container tag until the first end marker. */
+function extractContainerFragment(
+  html: string,
+  openPattern: RegExp,
+  endMarkers: RegExp[],
+): string {
+  const openMatch = html.match(openPattern);
+  if (!openMatch) return "";
+  const startIdx = html.indexOf(openMatch[0]) + openMatch[0].length;
+  let endIdx = html.length;
+  const tail = html.slice(startIdx);
+  for (const marker of endMarkers) {
+    const hit = tail.match(marker);
+    if (hit?.index !== undefined) {
+      endIdx = Math.min(endIdx, startIdx + hit.index);
+    }
+  }
+  return html.slice(startIdx, endIdx);
+}
+
+function bodyLooksLikeTitle(body: string, title: string): boolean {
+  return isBodyTooShort(body, title);
 }
 
 function extractMetaDescription(html: string): string {
@@ -351,13 +378,16 @@ function extractArticleBodyFromHtml(html: string, pageUrl: string): string {
   const host = hostOf(pageUrl);
 
   if (host.includes("ada.lk")) {
-    const wrap =
-      html.match(
-        /<div[^>]+class=["'][^"']*\bsingle-body-wrap\b[^"']*["'][^>]*>([\s\S]*?)<\/div>\s*<div[^>]+class=["'][^"']*social-media/i,
-      )?.[1] ||
-      html.match(
-        /<div[^>]+class=["'][^"']*\bsingle-body-wrap\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
-      )?.[1];
+    // single-body-wrap nests share widgets; non-greedy </div> stops too early.
+    const wrap = extractContainerFragment(
+      html,
+      /<div[^>]+class=["'][^"']*\bsingle-body-wrap\b[^"']*["'][^>]*>/i,
+      [
+        /<div[^>]+class=["'][^"']*\bsocial-media-icons\b/i,
+        /<p class="text-uppercase mb-0 text-center">\s*popular news/i,
+        /<div[^>]+class=["'][^"']*\bcomment-form\b/i,
+      ],
+    );
     if (wrap) {
       const text = htmlFragmentToParagraphs(wrap);
       if (text.length >= MIN_BODY_CHARS) return capBody(text);
@@ -365,8 +395,20 @@ function extractArticleBodyFromHtml(html: string, pageUrl: string): string {
   }
 
   if (host.includes("adaderana.lk")) {
+    const prose = extractContainerFragment(
+      html,
+      /<div[^>]+class=["'][^"']*\bprose\b[^"']*["'][^>]*>/i,
+      [
+        /<div[^>]+class=["'][^"']*\b(related|share|comment|sidebar)\b/i,
+        /<section[^>]+class=["'][^"']*\b(related|comment)\b/i,
+      ],
+    );
+    if (prose) {
+      const text = htmlFragmentToParagraphs(prose);
+      if (text.length >= MIN_BODY_CHARS) return capBody(text);
+    }
     for (const match of html.matchAll(
-      /<div[^>]+class=["'][^"']*\bprose\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi,
+      /<div[^>]+class=["'][^"']*\bnews-content\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi,
     )) {
       const text = htmlFragmentToParagraphs(match[1]);
       if (text.length >= MIN_BODY_CHARS) return capBody(text);
@@ -413,6 +455,7 @@ function extractArticleBodyFromHtml(html: string, pageUrl: string): string {
 type ArticlePageData = {
   coverImage: string;
   body: string;
+  fetched: boolean;
 };
 
 async function fetchArticlePageData(sourceUrl: string): Promise<ArticlePageData | null> {
@@ -442,14 +485,25 @@ async function fetchArticlePageData(sourceUrl: string): Promise<ArticlePageData 
       const html = await res.text();
       const coverImage = extractImageFromPageHtml(html, pageUrl);
       const body = extractArticleBodyFromHtml(html, pageUrl);
-      if (coverImage || body) {
-        return { coverImage, body };
-      }
+      return { coverImage, body, fetched: true };
     } catch {
       /* retry once */
     }
   }
   return null;
+}
+
+function resolveArticleBody(item: FeedItem, title: string): string {
+  for (const candidate of [item.body, item.excerpt]) {
+    const text = candidate.trim();
+    if (text && !bodyLooksLikeTitle(text, title)) {
+      return capBody(text);
+    }
+  }
+  if (item.pageFetched) {
+    return capBody(item.body || item.excerpt || "");
+  }
+  return capBody(item.body || item.excerpt || title);
 }
 
 function extractImageFromPageHtml(html: string, pageUrl: string): string {
@@ -558,9 +612,10 @@ async function fetchRss(url: string, limit: number): Promise<FeedItem[]> {
 
     return {
       ...item,
+      pageFetched: pageData.fetched,
       coverImage: item.coverImage || pageData.coverImage,
       body:
-        needsBody && pageData.body && !isBodyTooShort(pageData.body, item.title)
+        needsBody && pageData.body && !bodyLooksLikeTitle(pageData.body, item.title)
           ? pageData.body
           : item.body,
     };
@@ -647,9 +702,7 @@ export async function runNewsIngest(options?: {
           const existingCover = String(existingData.coverImage || "").trim();
           const existingBody = String(existingData.body || "").trim();
           const needsCover = !existingCover;
-          const needsBody =
-            existingBody.length < ADMIN_BODY_MIN_CHARS &&
-            isBodyTooShort(existingBody, title);
+          const needsBody = bodyLooksLikeTitle(existingBody, title);
           const updates: Record<string, string | number> = {};
 
           let pageData: ArticlePageData | null = null;
@@ -664,15 +717,22 @@ export async function runNewsIngest(options?: {
 
           if (needsBody) {
             let fullerBody = item.body;
-            if (isBodyTooShort(fullerBody, title)) {
+            if (bodyLooksLikeTitle(fullerBody, title)) {
               fullerBody = pageData?.body || fullerBody;
             }
             if (
               fullerBody &&
               fullerBody.length > existingBody.length &&
-              !isBodyTooShort(fullerBody, title)
+              !bodyLooksLikeTitle(fullerBody, title)
             ) {
               updates.body = capBody(fullerBody);
+              updates.readingTimeMin = readingTime(String(updates.body));
+            } else if (
+              pageData?.body &&
+              !bodyLooksLikeTitle(pageData.body, title) &&
+              pageData.body.length > existingBody.length
+            ) {
+              updates.body = capBody(pageData.body);
               updates.readingTimeMin = readingTime(String(updates.body));
             }
           }
@@ -695,7 +755,7 @@ export async function runNewsIngest(options?: {
           continue;
         }
 
-        const body = capBody(item.body || item.excerpt || title);
+        const body = resolveArticleBody(item, title);
 
         const now = new Date().toISOString();
         const ref = await db.collection("articles").add({
