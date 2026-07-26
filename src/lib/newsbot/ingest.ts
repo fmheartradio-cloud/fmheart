@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { getAdminDb } from "@/lib/firebase/admin";
+import { hasSinhalaNewsText } from "@/lib/sinhala-script";
 
 export type NewsSource = {
   id: string;
@@ -79,33 +80,172 @@ function readingTime(body: string): number {
   return Math.max(1, Math.ceil(words / 180));
 }
 
-function firstImageFromXml(block: string): string {
-  const media = block.match(/url=["']([^"']+)["']/i);
-  if (media?.[1] && /\.(jpe?g|png|webp|gif)/i.test(media[1])) return media[1];
-  const img = block.match(/<img[^>]+src=["']([^"']+)["']/i);
-  return img?.[1] || "";
+const NEWSBOT_USER_AGENT = "FMHeartNewsBot/1.0 (+https://fmheart.lk)";
+
+function decodeHtmlEntities(raw: string): string {
+  return raw
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) =>
+      String.fromCharCode(parseInt(hex, 16)),
+    )
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(Number(dec)));
+}
+
+function unwrapCdata(raw: string): string {
+  const trimmed = raw.trim();
+  const match = trimmed.match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/i);
+  return match ? match[1] : trimmed;
+}
+
+function isImageMime(type: string): boolean {
+  return /^image\//i.test(type.trim());
+}
+
+function isImageUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  if (/\.(jpe?g|png|webp|gif|avif)(\?|$|#)/i.test(lower)) return true;
+  if (/[?&](format|fm|f)=?(jpg|jpeg|png|webp|gif)/i.test(lower)) return true;
+  return false;
+}
+
+function absolutizeUrl(url: string, ...bases: (string | undefined)[]): string {
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  for (const base of bases) {
+    if (!base) continue;
+    try {
+      return new URL(trimmed, base).href;
+    } catch {
+      /* try next base */
+    }
+  }
+  return trimmed;
+}
+
+function xmlTagInner(block: string, tag: string): string {
+  const escaped = tag.replace(":", "\\:");
+  const match = block.match(
+    new RegExp(`<${escaped}[^>]*>([\\s\\S]*?)<\\/${escaped}>`, "i"),
+  );
+  return match?.[1] || "";
+}
+
+function imageFromHtmlFragment(
+  html: string,
+  itemLink: string,
+  feedBase: string,
+): string {
+  const decoded = decodeHtmlEntities(unwrapCdata(html));
+  for (const match of decoded.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)) {
+    const src = match[1];
+    if (!src || /^data:/i.test(src)) continue;
+    const abs = absolutizeUrl(src, itemLink, feedBase);
+    if (isImageUrl(abs)) return abs;
+  }
+  return "";
+}
+
+function firstImageFromXml(
+  block: string,
+  itemLink: string,
+  feedBase: string,
+): string {
+  const candidates: string[] = [];
+
+  for (const match of block.matchAll(/<media:(?:content|thumbnail)[^>]*>/gi)) {
+    const tag = match[0];
+    const url = tag.match(/\burl=["']([^"']+)["']/i)?.[1];
+    const type = tag.match(/\btype=["']([^"']+)["']/i)?.[1] || "";
+    if (url && (isImageMime(type) || isImageUrl(url))) {
+      candidates.push(absolutizeUrl(url, itemLink, feedBase));
+    }
+  }
+
+  for (const match of block.matchAll(/<enclosure[^>]*>/gi)) {
+    const tag = match[0];
+    const url = tag.match(/\burl=["']([^"']+)["']/i)?.[1];
+    const type = tag.match(/\btype=["']([^"']+)["']/i)?.[1] || "";
+    if (url && (isImageMime(type) || isImageUrl(url))) {
+      candidates.push(absolutizeUrl(url, itemLink, feedBase));
+    }
+  }
+
+  for (const tag of ["description", "content:encoded"]) {
+    const raw = xmlTagInner(block, tag);
+    if (!raw) continue;
+    const fromHtml = imageFromHtmlFragment(raw, itemLink, feedBase);
+    if (fromHtml) candidates.push(fromHtml);
+  }
+
+  return candidates.find((url) => Boolean(url)) || "";
+}
+
+function extractImageFromPageHtml(html: string, pageUrl: string): string {
+  const metaPatterns = [
+    /property=["']og:image(?::url)?["'][^>]*content=["']([^"']+)["']/i,
+    /content=["']([^"']+)["'][^>]*property=["']og:image(?::url)?["']/i,
+    /name=["']twitter:image(?::src)?["'][^>]*content=["']([^"']+)["']/i,
+    /content=["']([^"']+)["'][^>]*name=["']twitter:image(?::src)?["']/i,
+  ];
+  for (const pattern of metaPatterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) {
+      return absolutizeUrl(decodeHtmlEntities(match[1]), pageUrl);
+    }
+  }
+
+  for (const match of html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)) {
+    const src = match[1];
+    if (!src || /^data:/i.test(src)) continue;
+    const lower = src.toLowerCase();
+    if (/logo|icon|avatar|pixel|spacer|1x1|tracking|badge|sprite/i.test(lower)) {
+      continue;
+    }
+    const abs = absolutizeUrl(decodeHtmlEntities(src), pageUrl);
+    if (isImageUrl(abs)) return abs;
+  }
+
+  return "";
+}
+
+async function fetchCoverImageFromPage(sourceUrl: string): Promise<string> {
+  if (!sourceUrl) return "";
+  try {
+    const res = await fetch(sourceUrl, {
+      headers: {
+        "User-Agent": NEWSBOT_USER_AGENT,
+        Accept: "text/html,*/*",
+      },
+      redirect: "follow",
+      cache: "no-store",
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) return "";
+    const html = await res.text();
+    return extractImageFromPageHtml(html, sourceUrl);
+  } catch {
+    return "";
+  }
 }
 
 function parseRssItems(xml: string, limit: number): FeedItem[] {
+  const feedBase = stripHtml(xmlTagInner(xml.split(/<item[\s>]/i)[0], "link"));
   const items: FeedItem[] = [];
   const chunks = xml.split(/<item[\s>]/i).slice(1);
   for (const chunk of chunks.slice(0, limit)) {
-    const title = stripHtml(
-      chunk.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "",
-    );
+    const title = stripHtml(xmlTagInner(chunk, "title"));
     const link = stripHtml(
-      chunk.match(/<link[^>]*>([\s\S]*?)<\/link>/i)?.[1] ||
-        chunk.match(/<guid[^>]*>([\s\S]*?)<\/guid>/i)?.[1] ||
-        "",
+      xmlTagInner(chunk, "link") || xmlTagInner(chunk, "guid"),
     );
-    const description = stripHtml(
-      chunk.match(/<description[^>]*>([\s\S]*?)<\/description>/i)?.[1] || "",
-    );
-    const content = stripHtml(
-      chunk.match(
-        /<content:encoded[^>]*>([\s\S]*?)<\/content:encoded>/i,
-      )?.[1] || "",
-    );
+    const description = stripHtml(xmlTagInner(chunk, "description"));
+    const content = stripHtml(xmlTagInner(chunk, "content:encoded"));
     if (!title) continue;
     const body = (content || description || title).slice(0, 4000);
     items.push({
@@ -113,7 +253,7 @@ function parseRssItems(xml: string, limit: number): FeedItem[] {
       sourceUrl: link,
       excerpt: (description || title).slice(0, 400),
       body,
-      coverImage: firstImageFromXml(chunk),
+      coverImage: firstImageFromXml(chunk, link, feedBase),
     });
   }
   return items;
@@ -122,7 +262,7 @@ function parseRssItems(xml: string, limit: number): FeedItem[] {
 async function fetchRss(url: string, limit: number): Promise<FeedItem[]> {
   const res = await fetch(url, {
     headers: {
-      "User-Agent": "FMHeartNewsBot/1.0 (+https://fmheart.lk)",
+      "User-Agent": NEWSBOT_USER_AGENT,
       Accept: "application/rss+xml, application/xml, text/xml, */*",
     },
     cache: "no-store",
@@ -130,7 +270,15 @@ async function fetchRss(url: string, limit: number): Promise<FeedItem[]> {
   });
   if (!res.ok) throw new Error(`RSS ${res.status} for ${url}`);
   const xml = await res.text();
-  return parseRssItems(xml, limit);
+  const items = parseRssItems(xml, limit);
+
+  return Promise.all(
+    items.map(async (item) => {
+      if (item.coverImage || !item.sourceUrl) return item;
+      const coverImage = await fetchCoverImageFromPage(item.sourceUrl);
+      return coverImage ? { ...item, coverImage } : item;
+    }),
+  );
 }
 
 function jaccard(a: string, b: string): number {
@@ -194,6 +342,11 @@ export async function runNewsIngest(options?: {
 
       for (const item of items) {
         const title = item.title.trim();
+        if (!hasSinhalaNewsText(title, item.excerpt)) {
+          row.skipped += 1;
+          continue;
+        }
+
         const hash = sourceHash(item.sourceUrl, title);
         const dupHash = await db
           .collection("articles")

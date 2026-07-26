@@ -100,10 +100,16 @@ def title_too_similar(db, title: str, threshold: float = 0.9) -> bool:
 
 def save_draft(item: dict[str, Any]) -> str | None:
     """Insert article as draft. Returns doc id or None if skipped."""
+    from sinhala_script import has_sinhala_news_text
+
     db = get_db()
     url = (item.get("sourceUrl") or "").strip()
     title = (item.get("title") or "").strip()
     if not title:
+        return None
+
+    excerpt = (item.get("excerpt") or "").strip()
+    if not has_sinhala_news_text(title, excerpt):
         return None
 
     h = source_hash(url, title)

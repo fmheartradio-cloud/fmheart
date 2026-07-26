@@ -1,6 +1,7 @@
 import type { CmsArticle, CmsArticleInput } from "@/types/cms";
 import { gossipNews, latestNews } from "@/data/mock";
 import { isFirebaseConfigured } from "@/lib/firebase/client";
+import { hasSinhalaNewsText } from "@/lib/sinhala-script";
 
 function slugify(text: string): string {
   // Prefer short ASCII slugs. Pure-Sinhala titles → news-{id}
@@ -128,6 +129,16 @@ function sortByUpdated(items: CmsArticle[]): CmsArticle[] {
   });
 }
 
+/** Hide non-Sinhala news on public site; admin (status=all) and gossip unchanged. */
+function filterPublicNews(items: CmsArticle[], status: string): CmsArticle[] {
+  if (status === "all") return items;
+  return items.filter(
+    (a) =>
+      a.type !== "news" ||
+      hasSinhalaNewsText(a.title, a.excerpt),
+  );
+}
+
 async function tryFirestore() {
   if (!isFirebaseConfigured()) return null;
   const { getDb } = await import("@/lib/firebase/client");
@@ -177,6 +188,7 @@ export async function listArticles(options?: {
         (d) => ({ id: d.id, ...d.data() }) as CmsArticle,
       );
       if (type) items = items.filter((a) => a.type === type);
+      items = filterPublicNews(items, status);
       return sortByUpdated(items).slice(0, limitCount);
     }
   } catch (err) {
@@ -189,6 +201,7 @@ export async function listArticles(options?: {
   let items = mockToCms();
   if (type) items = items.filter((a) => a.type === type);
   if (status !== "all") items = items.filter((a) => a.status === status);
+  items = filterPublicNews(items, status);
   return items.slice(0, limitCount);
 }
 
@@ -222,7 +235,14 @@ export async function getArticleBySlug(rawSlug: string): Promise<CmsArticle | nu
           const snap = await withTimeout(getDocs(q), 10000, "Firestore read");
           if (!snap.empty) {
             const d = snap.docs[0]!;
-            return { id: d.id, ...d.data() } as CmsArticle;
+            const article = { id: d.id, ...d.data() } as CmsArticle;
+            if (
+              article.type === "news" &&
+              !hasSinhalaNewsText(article.title, article.excerpt)
+            ) {
+              return null;
+            }
+            return article;
           }
         } catch {
           // composite index may be missing — fall through to scan
@@ -231,8 +251,7 @@ export async function getArticleBySlug(rawSlug: string): Promise<CmsArticle | nu
       }
 
       const published = await listArticles({ status: "published", limit: 100 });
-      return (
-        published.find((a) => {
+      const match = published.find((a) => {
           const title = (a.title || "").trim().replace(/[.\s]+$/g, "");
           return slugVariants.some(
             (v) =>
@@ -243,8 +262,8 @@ export async function getArticleBySlug(rawSlug: string): Promise<CmsArticle | nu
               // long Sinhala URLs: title is a prefix of the slug param
               (v.length > 20 && (v.startsWith(title) || title.startsWith(v.slice(0, 40)))),
           );
-        }) ?? null
-      );
+      });
+      return match ?? null;
     }
   } catch (err) {
     console.warn("[articles] getBySlug failed:", err);
