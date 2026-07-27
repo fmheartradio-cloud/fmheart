@@ -68,7 +68,7 @@ export default function AdminHeroPage() {
           Hero Posts
         </h1>
         <p className="mt-1 text-sm text-fh-muted">
-          Homepage slider දැන් නවතම published news 5 ස්වයංක්‍රීයව පෙන්වයි.
+          Homepage slider දැන් නවතම published news 10 ස්වයංක්‍රීයව පෙන්වයි.
           මෙහි slides CMS backup / legacy — public homepage එක ignore කරයි.
         </p>
       </div>
@@ -146,7 +146,7 @@ export default function AdminHeroPage() {
             className="border border-neutral-300 px-3 py-2 text-sm"
             onClick={() =>
               setHeroSlidesForm((prev) =>
-                prev.length < 5 ? [...prev, emptyHeroSlide()] : prev,
+                prev.length < 10 ? [...prev, emptyHeroSlide()] : prev,
               )
             }
           >

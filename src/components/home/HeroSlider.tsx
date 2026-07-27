@@ -54,11 +54,6 @@ export function HeroSlider({ slides: initialSlides }: HeroSliderProps) {
         <h1 className="font-sigiri animate-fade-up max-w-3xl text-2xl font-extrabold leading-snug text-white md:text-4xl lg:text-[2.75rem]">
           {slide.title}
         </h1>
-        {slide.excerpt && (
-          <p className="mt-2 max-w-2xl font-article text-sm text-white/85 md:text-base">
-            {slide.excerpt}
-          </p>
-        )}
         <div className="mt-4 flex items-center gap-4">
           <Link
             href={`/news/${slide.slug}`}

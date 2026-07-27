@@ -23,11 +23,11 @@ export const revalidate = 0;
 
 export default async function HomePage() {
   const [news, gossip] = await Promise.all([
-    listArticles({ type: "news", status: "published", limit: 8 }),
+    listArticles({ type: "news", status: "published", limit: 10 }),
     listArticles({ type: "gossip", status: "published", limit: 8 }),
   ]);
 
-  const heroSlides = news.slice(0, 5).map(cmsToHeroSlide);
+  const heroSlides = news.slice(0, 10).map(cmsToHeroSlide);
   const newsCards = news.map(cmsToCard);
   const gossipCards = gossip.map(cmsToCard);
   const mostReadCards = news.slice(0, 5).map((a) => ({
