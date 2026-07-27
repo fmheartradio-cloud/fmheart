@@ -72,6 +72,7 @@ export default function LivePage() {
                 title: "Pulse Studio",
                 body: "Recording & podcast bookings.",
                 href: "/pulse-studio",
+                logo: "/logo/pulse-studio.png",
               },
             ].map((card) => (
               <Link
@@ -79,7 +80,19 @@ export default function LivePage() {
                 href={card.href}
                 className="border border-neutral-200 p-5 transition hover:border-fh-red"
               >
-                <h2 className="font-heading text-lg font-bold">{card.title}</h2>
+                {"logo" in card && card.logo ? (
+                  <div className="mb-3 flex h-14 items-center justify-center bg-fh-black px-3">
+                    <Image
+                      src={card.logo}
+                      alt={card.title}
+                      width={280}
+                      height={80}
+                      className="h-12 w-auto max-w-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <h2 className="font-heading text-lg font-bold">{card.title}</h2>
+                )}
                 <p className="mt-2 text-sm text-fh-muted">{card.body}</p>
               </Link>
             ))}

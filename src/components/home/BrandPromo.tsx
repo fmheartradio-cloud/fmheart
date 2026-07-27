@@ -36,23 +36,19 @@ export function BrandPromo() {
 
       <Link
         href="/pulse-studio"
-        className="group relative overflow-hidden bg-neutral-900 px-6 py-8 text-white"
+        className="group relative overflow-hidden bg-fh-black px-6 py-8 text-white"
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_80%,rgba(255,23,68,0.25),transparent_50%)]" />
-        <div className="relative flex items-start gap-4">
+        <div className="relative flex flex-col items-start gap-4 sm:flex-row sm:items-center">
           <Image
-            src="/logo/fmheart-pulse-icon.png"
+            src="/logo/pulse-studio.png"
             alt="Pulse Studio"
-            width={64}
-            height={64}
-            className="h-14 w-14 object-contain"
+            width={420}
+            height={160}
+            className="h-16 w-auto max-w-full object-contain sm:h-20"
+            priority={false}
           />
-          <div>
-            <div className="mb-2 h-1 w-16 bg-fh-red" aria-hidden />
-            <h3 className="font-heading text-2xl font-extrabold tracking-wide">
-              PULSE <span className="text-fh-red">STUDIO</span>
-            </h3>
-            <p className="mt-2 max-w-sm text-sm text-neutral-400">
+          <div className="min-w-0">
+            <p className="max-w-sm text-sm text-neutral-400">
               Recording, podcast & production bookings — your sound, our studio.
             </p>
             <span className="mt-4 inline-block font-heading text-sm font-bold text-fh-red group-hover:underline">
