@@ -1,12 +1,12 @@
 import { heroSlides as mockSlides } from "@/data/mock";
 import { isFirebaseConfigured } from "@/lib/firebase/client";
 import { upgradeImageUrl } from "@/lib/image-url";
-import { toPlainExcerpt } from "@/lib/plain-text";
+import { toHeroExcerpt } from "@/lib/plain-text";
 import { listArticles, mapFirebaseError } from "@/services/articles";
 import type { Article } from "@/types";
 import type { CmsArticle } from "@/types/cms";
 
-const HERO_NEWS_LIMIT = 5;
+const HERO_NEWS_LIMIT = 10;
 
 const SETTINGS_DOC = "hero";
 
@@ -56,7 +56,7 @@ function normalizeSlides(raw: unknown): Article[] {
 
 /** Map a published news article to a homepage hero slide. */
 export function cmsToHeroSlide(article: CmsArticle): Article {
-  const excerpt = toPlainExcerpt(article.excerpt, article.body, 280);
+  const excerpt = toHeroExcerpt(article.excerpt, article.body, 280);
   return {
     id: article.id,
     title: article.title,
@@ -71,7 +71,7 @@ export function cmsToHeroSlide(article: CmsArticle): Article {
   };
 }
 
-/** Homepage hero — 5 newest published news (Sinhala filter via listArticles). */
+/** Homepage hero — 10 newest published news (Sinhala filter via listArticles). */
 export async function getLatestNewsHeroSlides(): Promise<Article[]> {
   try {
     const articles = await listArticles({

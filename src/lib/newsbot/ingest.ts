@@ -11,6 +11,7 @@ import {
 } from "@/lib/image-url";
 import {
   containsHtmlMarkup,
+  looksLikeHtmlFragment,
   stripHtml,
   toPlainExcerpt,
   toPlainText,
@@ -944,7 +945,10 @@ async function fetchRss(url: string, limit: number): Promise<FeedItem[]> {
     const needsBody =
       isBodyTooShort(item.body, item.title) ||
       containsHtmlMarkup(item.body);
-    const needsExcerpt = containsHtmlMarkup(item.excerpt);
+    const needsExcerpt =
+      containsHtmlMarkup(item.excerpt) ||
+      looksLikeHtmlFragment(item.excerpt) ||
+      /<img\b/i.test(item.excerpt);
     if (!needsCover && !needsBody && !needsExcerpt) return item;
 
     const pageData = await fetchArticlePageData(item.sourceUrl);
@@ -1067,7 +1071,9 @@ export async function runNewsIngest(options?: {
           const needsEntityFix = hasUndecodedHtmlEntities(existingBody);
           const needsExcerptFix =
             containsHtmlMarkup(existingExcerpt) ||
-            hasUndecodedHtmlEntities(existingExcerpt);
+            hasUndecodedHtmlEntities(existingExcerpt) ||
+            looksLikeHtmlFragment(existingExcerpt) ||
+            /<img\b/i.test(existingExcerpt);
           const needsCoverUpgrade =
             Boolean(existingCover) &&
             (isLikelySmallImageUrl(existingCover) ||
@@ -1124,12 +1130,11 @@ export async function runNewsIngest(options?: {
             const bodyPlain = toPlainText(
               String(updates.body || existingBody || item.body),
             );
-            const fixedExcerpt = toPlainExcerpt(
-              existingExcerpt,
-              bodyPlain,
-              400,
-            );
-            if (fixedExcerpt && fixedExcerpt !== existingExcerpt) {
+            const fixedExcerpt =
+              toPlainExcerpt(existingExcerpt, bodyPlain, 400) ||
+              toPlainExcerpt(undefined, bodyPlain, 400) ||
+              title;
+            if (fixedExcerpt !== existingExcerpt) {
               updates.excerpt = fixedExcerpt;
               updates.seoDescription = fixedExcerpt;
             }
