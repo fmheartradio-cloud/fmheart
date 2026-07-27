@@ -6,11 +6,6 @@ sources:
     rss: https://www.nethnews.lk/feed/
     category: දේශීය
     active: true
-  - id: newsfirst-sinhala
-    name: News First Sinhala
-    list_url: https://sinhala.newsfirst.lk/
-    category: දේශීය
-    active: true
   - id: adaderana-sinhala
     name: Ada Derana Sinhala
     rss: https://sinhala.adaderana.lk/rsshotnews.php

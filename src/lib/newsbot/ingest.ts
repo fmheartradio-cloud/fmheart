@@ -45,13 +45,6 @@ export const DEFAULT_NEWS_SOURCES: NewsSource[] = [
     active: true,
   },
   {
-    id: "newsfirst-sinhala",
-    name: "News First Sinhala",
-    listUrl: "https://sinhala.newsfirst.lk/",
-    category: "දේශීය",
-    active: true,
-  },
-  {
     id: "adaderana-sinhala",
     name: "Ada Derana Sinhala",
     rss: "https://sinhala.adaderana.lk/rsshotnews.php",
