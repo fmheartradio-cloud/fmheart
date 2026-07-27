@@ -37,12 +37,22 @@ $h=@{Authorization="Bearer YOUR_CRON_SECRET"}; Invoke-WebRequest -Uri "https://f
 - **Action:** `powershell.exe`
 - **Arguments:** `-NoProfile -ExecutionPolicy Bypass -File "C:\Users\narad\fmheart\scripts\trigger-newsbot.ps1"`
 
-## Primary schedule (already live)
+## Primary schedule (no PC required)
 
-**GitHub Actions** (`.github/workflows/newsbot.yml`) runs `*/10 * * * *` on `master` and POSTs to the same URL using the repo secret `CRON_SECRET`.
+**GitHub Actions** (`.github/workflows/newsbot.yml`) on `master`:
+
+- Schedule: `7,17,27,37,47,57 * * * *` (every 10 minutes, UTC)
+- Uses repo secret `CRON_SECRET`
+- Runs on GitHub’s servers — your PC can be off
+
+Check runs: https://github.com/fmheartradio-cloud/fmheart/actions/workflows/newsbot.yml  
+
+Filter for event type **`schedule`** (not only `workflow_dispatch`). GitHub may delay the first scheduled run by up to ~1 hour after the workflow is added.
 
 Manual run:
 
 ```powershell
-& "C:\Program Files\GitHub CLI\gh.exe" workflow run newsbot.yml
+& "C:\Program Files\GitHub CLI\gh.exe" workflow run newsbot.yml -R fmheartradio-cloud/fmheart
 ```
+
+If `schedule` never appears after an hour, use **cron-job.org** above as a 24/7 backup (also no PC).

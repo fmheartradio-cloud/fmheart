@@ -1,0 +1,31 @@
+# Cloud schedule only — no local PC. GitHub hosts the runner.
+name: Newsbot every 10 min
+
+on:
+  schedule:
+    - cron: "5,15,25,35,45,55 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  newsbot:
+    name: Ingest and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST newsbot cron API
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          test -n "${CRON_SECRET}"
+          code=$(curl -sS -o /tmp/out.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "https://fmheart-tau.vercel.app/api/cron/newsbot")
+          echo "HTTP ${code}"
+          cat /tmp/out.json
+          echo
+          test "${code}" -ge 200 -a "${code}" -lt 300
