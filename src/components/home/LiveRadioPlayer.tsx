@@ -85,11 +85,7 @@ export function LiveRadioPlayer() {
           <p className="mb-2 text-[11px] tracking-wider text-neutral-500 uppercase">
             Recently Played
           </p>
-          {recent.length === 0 ? (
-            <p className="text-xs text-neutral-500">
-              ගීත වෙනස් වෙනකොට මෙතන live update වෙයි.
-            </p>
-          ) : (
+          {recent.length > 0 && (
             <ul className="space-y-2">
               {recent.map((track) => (
                 <li
