@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
 import { SITE } from "@/lib/site";
@@ -27,6 +28,41 @@ const brandLinks = [
 export function Footer() {
   return (
     <footer className="bg-fh-black text-neutral-300">
+      <div className="border-b border-white/10 bg-fh-black">
+        <div className="relative mx-auto max-w-7xl px-3 py-4 md:px-4 md:py-5">
+          <Image
+            src="/logo/footer-image.png"
+            alt="FM Heart brands — The Heart Academy, Pulse Studio, and partners"
+            width={1600}
+            height={280}
+            className="h-auto w-full object-contain"
+            sizes="(max-width: 1280px) 100vw, 1280px"
+            priority={false}
+          />
+          {/* Clickable zones for key brands in the strip */}
+          <div className="absolute inset-x-3 inset-y-4 grid grid-cols-6 md:inset-x-4 md:inset-y-5">
+            <a
+              href="https://tha.lk"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block"
+              aria-label="The Heart Academy"
+            />
+            <Link href="/" className="block" aria-label="FM Heart" />
+            <a
+              href="https://wa.me/94771664184"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block"
+              aria-label="Pulse Studio WhatsApp booking"
+            />
+            <span className="block" aria-hidden />
+            <span className="block" aria-hidden />
+            <span className="block" aria-hidden />
+          </div>
+        </div>
+      </div>
+
       <div className="border-b border-white/10">
         <div className="mx-auto grid max-w-7xl gap-6 px-4 py-10 md:grid-cols-[1.2fr_1fr_1fr]">
           <div>
