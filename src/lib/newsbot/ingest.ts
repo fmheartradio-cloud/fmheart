@@ -59,13 +59,6 @@ export const DEFAULT_NEWS_SOURCES: NewsSource[] = [
     active: true,
   },
   {
-    id: "bbc-sinhala",
-    name: "BBC Sinhala",
-    rss: "https://feeds.bbci.co.uk/sinhala/rss.xml",
-    category: "ජාත්‍යන්තර",
-    active: true,
-  },
-  {
     id: "lankaenews",
     name: "Lanka eNews",
     listUrl: "https://www.lankaenews.com/",

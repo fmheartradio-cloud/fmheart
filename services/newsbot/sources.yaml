@@ -16,11 +16,6 @@ sources:
     rss: https://sinhala.adaderana.lk/rsshotnews.php
     category: දේශීය
     active: true
-  - id: bbc-sinhala
-    name: BBC Sinhala
-    rss: https://feeds.bbci.co.uk/sinhala/rss.xml
-    category: ජාත්‍යන්තර
-    active: true
   - id: lankaenews
     name: Lanka eNews
     list_url: https://www.lankaenews.com/
