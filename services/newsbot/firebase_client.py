@@ -192,6 +192,14 @@ def save_draft(item: dict[str, Any]) -> str | None:
             updates["status"] = "published"
             updates["publishedAt"] = datetime.now(tz=timezone.utc).isoformat()
 
+        existing_author = str(existing.get("author") or "").strip()
+        if (
+            existing.get("ingestedBy") == "newsbot"
+            and existing_author.startswith("FM Heart ·")
+            and existing_author != "FM Heart"
+        ):
+            updates["author"] = "FM Heart"
+
         if updates:
             now = datetime.now(tz=timezone.utc).isoformat()
             updates["updatedAt"] = now
@@ -217,7 +225,7 @@ def save_draft(item: dict[str, Any]) -> str | None:
         "body": body,
         "category": item.get("category") or "දේශීය",
         "coverImage": (item.get("coverImage") or "").strip(),
-        "author": f"FM Heart · {source_name}",
+        "author": "FM Heart",
         "status": status,
         "tags": item.get("tags") or [source_name],
         "readingTimeMin": _reading_time(body),

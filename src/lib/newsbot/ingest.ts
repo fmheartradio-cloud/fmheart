@@ -1234,6 +1234,15 @@ export async function runNewsIngest(options?: {
             updates.publishedAt = new Date().toISOString();
           }
 
+          const existingAuthor = String(existingData.author || "").trim();
+          if (
+            existingData.ingestedBy === "newsbot" &&
+            existingAuthor.startsWith("FM Heart ·") &&
+            existingAuthor !== "FM Heart"
+          ) {
+            updates.author = "FM Heart";
+          }
+
           if (Object.keys(updates).length > 0) {
             updates.updatedAt = new Date().toISOString();
             await existing.ref.update(updates);
@@ -1275,7 +1284,7 @@ export async function runNewsIngest(options?: {
           body: toPlainText(body),
           category,
           coverImage,
-          author: `FM Heart · ${src.name}`,
+          author: "FM Heart",
           status: "published",
           tags: [src.name, category],
           readingTimeMin: readingTime(body),
