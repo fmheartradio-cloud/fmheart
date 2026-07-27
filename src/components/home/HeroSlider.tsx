@@ -49,9 +49,6 @@ export function HeroSlider({ slides: initialSlides }: HeroSliderProps) {
       ))}
 
       <div className="relative z-10 flex h-full min-h-[280px] flex-col justify-end p-4 md:min-h-[420px] md:p-8 lg:min-h-[480px]">
-        <span className="mb-3 inline-flex w-fit bg-fh-red px-3 py-1 font-heading text-xs font-extrabold tracking-wider text-white uppercase">
-          {slide.category}
-        </span>
         <h1 className="font-sigiri animate-fade-up max-w-3xl text-2xl font-extrabold leading-snug text-white md:text-4xl lg:text-[2.75rem]">
           {slide.title}
         </h1>

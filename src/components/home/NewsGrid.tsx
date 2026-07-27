@@ -63,9 +63,6 @@ export function NewsGrid({ title, articles, viewAllHref = "#" }: NewsGridProps) 
                     className="object-cover transition duration-500 group-hover:scale-105"
                     sizes="(max-width: 640px) calc(100vw - 1.5rem), (max-width: 1024px) calc(50vw - 1rem), 25vw"
                   />
-                  <span className="absolute top-2 left-2 bg-fh-red px-2 py-0.5 font-heading text-[10px] font-bold tracking-wide text-white uppercase">
-                    {article.category}
-                  </span>
                 </div>
                 <h3 className="font-news-headline mt-2.5 break-words text-[15px] leading-snug text-fh-ink transition group-hover:text-fh-red md:text-base">
                   {article.title}

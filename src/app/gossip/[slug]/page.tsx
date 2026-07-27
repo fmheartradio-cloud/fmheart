@@ -69,9 +69,6 @@ export default async function GossipArticlePage({ params }: Props) {
             Gossip
           </Link>
         </nav>
-        <span className="inline-block bg-fh-red px-2 py-0.5 font-heading text-xs font-bold text-white uppercase">
-          {article.category}
-        </span>
         <h1 className="font-news-headline mt-3 text-3xl leading-snug md:text-4xl">
           {article.title}
         </h1>

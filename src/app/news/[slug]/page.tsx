@@ -86,13 +86,8 @@ export default async function NewsArticlePage({ params }: Props) {
               <Link href="/news" className="hover:text-fh-red">
                 ප්‍රවෘත්ති
               </Link>
-              {" / "}
-              <span>{article.category}</span>
             </nav>
 
-            <span className="inline-block bg-fh-red px-2 py-0.5 font-heading text-xs font-bold text-white uppercase">
-              {article.category}
-            </span>
             <h1 className="font-news-headline mt-3 text-3xl leading-snug md:text-4xl">
               {article.title}
             </h1>

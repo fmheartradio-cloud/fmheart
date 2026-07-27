@@ -51,9 +51,6 @@ export default async function NewsPage() {
                     className="object-cover transition duration-500 group-hover:scale-105"
                     sizes="(max-width: 768px) 100vw, 33vw"
                   />
-                  <span className="absolute top-2 left-2 bg-fh-red px-2 py-0.5 font-heading text-[10px] font-bold text-white uppercase">
-                    {article.category}
-                  </span>
                 </div>
                 <h2 className="font-news-headline mt-3 text-lg leading-snug group-hover:text-fh-red">
                   {article.title}
