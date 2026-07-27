@@ -71,13 +71,17 @@ export default function LivePage() {
               {
                 title: "Pulse Studio",
                 body: "Recording & podcast bookings.",
-                href: "/pulse-studio",
+                href: "https://wa.me/94771664184",
                 logo: "/logo/pulse-studio.png",
+                external: true,
               },
             ].map((card) => (
               <Link
                 key={card.title}
                 href={card.href}
+                {...("external" in card && card.external
+                  ? { target: "_blank", rel: "noopener noreferrer" }
+                  : {})}
                 className="border border-neutral-200 p-5 transition hover:border-fh-red"
               >
                 {"logo" in card && card.logo ? (

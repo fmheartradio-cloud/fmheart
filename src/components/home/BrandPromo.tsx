@@ -1,11 +1,15 @@
 import Image from "next/image";
-import Link from "next/link";
+
+const HEART_ACADEMY_URL = "https://tha.lk";
+const PULSE_STUDIO_WHATSAPP = "https://wa.me/94771664184";
 
 export function BrandPromo() {
   return (
     <section className="grid gap-4 md:grid-cols-2">
-      <Link
-        href="/academy"
+      <a
+        href={HEART_ACADEMY_URL}
+        target="_blank"
+        rel="noopener noreferrer"
         className="group relative overflow-hidden bg-fh-black px-6 py-8 text-white"
       >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(213,0,0,0.35),transparent_55%)]" />
@@ -32,10 +36,12 @@ export function BrandPromo() {
             </span>
           </div>
         </div>
-      </Link>
+      </a>
 
-      <Link
-        href="/pulse-studio"
+      <a
+        href={PULSE_STUDIO_WHATSAPP}
+        target="_blank"
+        rel="noopener noreferrer"
         className="group relative overflow-hidden bg-fh-black px-6 py-8 text-white"
       >
         <div className="relative flex flex-col items-start gap-4 sm:flex-row sm:items-center">
@@ -56,7 +62,7 @@ export function BrandPromo() {
             </span>
           </div>
         </div>
-      </Link>
+      </a>
     </section>
   );
 }

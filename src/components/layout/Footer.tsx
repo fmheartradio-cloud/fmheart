@@ -14,8 +14,12 @@ const quickLinks = [
 ];
 
 const brandLinks = [
-  { href: "/academy", label: "The Heart Academy" },
-  { href: "/pulse-studio", label: "Pulse Studio" },
+  { href: "https://tha.lk", label: "The Heart Academy", external: true },
+  {
+    href: "https://wa.me/94771664184",
+    label: "Pulse Studio",
+    external: true,
+  },
   { href: "/advertise", label: "Advertise With Us" },
   { href: "/contact", label: "Contact" },
 ];
@@ -72,7 +76,13 @@ export function Footer() {
             <ul className="mt-3 space-y-2">
               {brandLinks.map((l) => (
                 <li key={l.href}>
-                  <Link href={l.href} className="text-sm hover:text-white">
+                  <Link
+                    href={l.href}
+                    {...("external" in l && l.external
+                      ? { target: "_blank", rel: "noopener noreferrer" }
+                      : {})}
+                    className="text-sm hover:text-white"
+                  >
                     {l.label}
                   </Link>
                 </li>
