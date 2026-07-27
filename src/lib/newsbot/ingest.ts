@@ -6,8 +6,7 @@ import {
 } from "@/lib/html-entities";
 import {
   finalizeCoverUrl,
-  isLikelyJunkCoverUrl,
-  isLikelySmallImageUrl,
+  needsHigherQualityCover,
   pickBestCoverUrl,
   upgradeImageUrl,
 } from "@/lib/image-url";
@@ -159,10 +158,7 @@ function normalizeCoverUrl(url: string): string {
 }
 
 function coverNeedsPageFetch(cover: string): boolean {
-  const trimmed = cover.trim();
-  if (!trimmed) return true;
-  if (isLikelyJunkCoverUrl(trimmed)) return true;
-  return isLikelySmallImageUrl(trimmed);
+  return needsHigherQualityCover(cover);
 }
 
 function extractItemLink(block: string): string {
@@ -602,7 +598,7 @@ type ArticlePageData = {
 };
 
 const JUNK_IMAGE_RE =
-  /logo|icon|avatar|pixel|spacer|1x1|tracking|badge|sprite|facebook|instagram|youtube|twitter|instagrame|advertising\.gif|lankahotnews\+advertising/i;
+  /logo|icon|avatar|pixel|spacer|1x1|tracking|badge|sprite|facebook|instagram|youtube|twitter|instagrame|advertising\.gif|lankahotnews\+advertising|pix\.png|lanka-e-news-log|new-year-\d{4}/i;
 
 function isJunkImageUrl(url: string): boolean {
   return JUNK_IMAGE_RE.test(url);
@@ -688,16 +684,21 @@ function resolveCoverImage(
   const page = normalizeCoverUrl(pageCover);
   const og = normalizeCoverUrl(ogCover);
 
-  if (isAdaHost(pageUrl) && page) {
-    if (!rss) return page;
-    if (shouldUpgradeAdaCover(rss, page, og)) return page;
+  if (isAdaHost(pageUrl)) {
+    if (page) {
+      if (!rss) return page;
+      if (shouldUpgradeAdaCover(rss, page, og)) return page;
+    }
+    const adaBest = pickBestCoverUrl(page, og, rss);
+    if (adaBest) return adaBest;
   }
 
-  const best = pickBestCoverUrl(rss, page, og);
+  // og:image share cards are usually the highest quality for our sources.
+  const best = pickBestCoverUrl(og, page, rss);
   if (best) return best;
-  if (og && (!rss || isLikelySmallImageUrl(rss))) return og;
-  if (page && (!rss || isLikelySmallImageUrl(rss))) return page;
-  return normalizeCoverUrl(rss);
+  if (og && needsHigherQualityCover(rss)) return og;
+  if (page && needsHigherQualityCover(rss)) return page;
+  return rss;
 }
 
 async function fetchArticlePageData(sourceUrl: string): Promise<ArticlePageData | null> {
@@ -750,6 +751,32 @@ function resolveArticleBody(item: FeedItem, title: string): string {
   return capBody(item.body || item.excerpt || title);
 }
 
+function extractContentImageFromHtml(html: string, pageUrl: string): string {
+  const containers = [
+    /<article[^>]*>([\s\S]*?)<\/article>/i,
+    /<div[^>]+itemprop=["']articleBody["'][^>]*>([\s\S]*?)<\/div>/i,
+    /<div[^>]+class=["'][^"']*\b(?:entry-content|article-content|post-content|story-content|single-body-wrap|news-content|prose)\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+  ];
+  const candidates: string[] = [];
+
+  for (const pattern of containers) {
+    const block = html.match(pattern)?.[1];
+    if (!block) continue;
+    for (const match of block.matchAll(/<img[^>]+>/gi)) {
+      const tag = match[0];
+      const src =
+        tag.match(/\bsrc=["']([^"']+)["']/i)?.[1] ||
+        tag.match(/\bdata-src=["']([^"']+)["']/i)?.[1] ||
+        tag.match(/\bdata-original=["']([^"']+)["']/i)?.[1];
+      if (!src || /^data:/i.test(src) || isJunkImageUrl(src)) continue;
+      const abs = normalizeCoverUrl(absolutizeUrl(decodeHtmlEntities(src), pageUrl));
+      if (abs && isImageUrl(abs)) candidates.push(abs);
+    }
+  }
+
+  return pickBestCoverUrl(...candidates);
+}
+
 function extractImageFromPageHtml(
   html: string,
   pageUrl: string,
@@ -763,14 +790,7 @@ function extractImageFromPageHtml(
   const og = ogCoverImage || extractOgImageFromHtml(html, pageUrl);
   if (og) return og;
 
-  for (const match of html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)) {
-    const src = match[1];
-    if (!src || /^data:/i.test(src) || isJunkImageUrl(src)) continue;
-    const abs = normalizeCoverUrl(absolutizeUrl(decodeHtmlEntities(src), pageUrl));
-    if (isImageUrl(abs)) return abs;
-  }
-
-  return "";
+  return extractContentImageFromHtml(html, pageUrl);
 }
 
 async function fetchCoverImageFromPage(sourceUrl: string): Promise<string> {
@@ -968,7 +988,12 @@ async function fetchRss(url: string, limit: number): Promise<FeedItem[]> {
     }
 
     const pageData = await fetchArticlePageData(item.sourceUrl);
-    if (!pageData) return item;
+    if (!pageData) {
+      return {
+        ...item,
+        coverImage: normalizeCoverUrl(item.coverImage),
+      };
+    }
 
     const body =
       needsBody && pageData.body && !bodyLooksLikeTitle(pageData.body, item.title)
@@ -1092,7 +1117,7 @@ export async function runNewsIngest(options?: {
             /<img\b/i.test(existingExcerpt);
           const needsCoverUpgrade =
             Boolean(existingCover) &&
-            (coverNeedsPageFetch(existingCover) ||
+            (needsHigherQualityCover(existingCover) ||
               upgradeImageUrl(existingCover) !== existingCover);
           const adaCoverUpgrade =
             Boolean(existingCover) && isAdaHost(item.sourceUrl);
@@ -1259,7 +1284,7 @@ export async function runNewsIngest(options?: {
         const body = resolveArticleBody(item, title);
         const category = inferItemCategory(src, item);
         const excerpt = toPlainExcerpt(item.excerpt, body, 400) || title;
-        const coverImage = finalizeCoverUrl(
+        let coverImage = finalizeCoverUrl(
           resolveCoverImage(
             item.coverImage,
             "",
@@ -1267,6 +1292,19 @@ export async function runNewsIngest(options?: {
             item.sourceUrl,
           ) || item.coverImage,
         );
+        if (!coverImage && item.sourceUrl) {
+          const pageData = await fetchArticlePageData(item.sourceUrl);
+          if (pageData) {
+            coverImage = finalizeCoverUrl(
+              resolveCoverImage(
+                item.coverImage,
+                pageData.coverImage,
+                pageData.ogCoverImage,
+                item.sourceUrl,
+              ),
+            );
+          }
+        }
 
         const now = new Date().toISOString();
         const ref = await db.collection("articles").add({

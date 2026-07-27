@@ -4,8 +4,12 @@ const WP_SIZE_SUFFIX_RE = /-\d+x\d+(?=\.(jpe?g|png|webp|gif|avif)(?:[?#]|$))/i;
 const BBC_WS_RE = /\/ace\/ws\/(\d+)\//i;
 const BBC_STANDARD_RE = /\/ace\/standard\/(\d+)\//i;
 const BBC_NEWS_RE = /\/news\/(\d+)\//i;
+const ADA_DERANA_SMALL_RE =
+  /(?:_S|_M|_t|-\d{2,3})\.(jpe?g|png|webp|gif|avif)(?:[?#]|$)/i;
 const THUMB_PATH_RE =
   /(?:^|[/_-])(thumb(?:nail)?s?|small|mini|icon|logo|avatar|sprite|brand)(?:[/_-]|\.)/i;
+
+const MIN_COVER_WIDTH = 600;
 
 function isBloggerCdn(host: string): boolean {
   const h = host.toLowerCase();
@@ -14,6 +18,11 @@ function isBloggerCdn(host: string): boolean {
     h.includes("bp.blogspot.com") ||
     h.includes("blogspot.com")
   );
+}
+
+function isAdaDeranaCdn(host: string, path: string): boolean {
+  const h = host.toLowerCase();
+  return h.includes("adaderanasinhala") || /adaderana/i.test(path);
 }
 
 function parseIntSafe(value: string): number {
@@ -43,7 +52,13 @@ export function estimateImageWidth(url: string): number {
     return Math.max(parseIntSafe(wpSize[1]), parseIntSafe(wpSize[2]));
   }
 
+  const adaNum = url.match(/-(\d{2,3})\.(jpe?g|png|webp|gif|avif)(?:[?#]|$)/i);
+  if (adaNum) return parseIntSafe(adaNum[1]);
+
   if (/_T\.(jpe?g|png|webp|gif|avif)/i.test(url)) return 120;
+  if (/_S\.(jpe?g|png|webp|gif|avif)/i.test(url)) return 200;
+  if (/_M\.(jpe?g|png|webp|gif|avif)/i.test(url)) return 350;
+  if (/_t\.(jpe?g|png|webp|gif|avif)/i.test(url)) return 150;
 
   try {
     const u = new URL(url);
@@ -70,18 +85,47 @@ export function isLikelySmallImageUrl(url: string): boolean {
 
   if (THUMB_PATH_RE.test(url)) return true;
   if (/_T\.(jpe?g|png|webp|gif|avif)/i.test(url)) return true;
+  if (/_S\.(jpe?g|png|webp|gif|avif)/i.test(url)) return true;
+  if (/_t\.(jpe?g|png|webp|gif|avif)/i.test(url)) return true;
+  if (/-\d{2,3}\.(jpe?g|png|webp|gif|avif)(?:[?#]|$)/i.test(url)) return true;
   if (/[?&](resize|fit|crop|thumb)=/i.test(url)) return true;
 
   const width = estimateImageWidth(url);
   return width > 0 && width < 400;
 }
 
+/** True when we should fetch the article page for a higher-quality cover. */
+export function needsHigherQualityCover(url: string): boolean {
+  if (!url.trim()) return true;
+  if (isLikelyJunkCoverUrl(url) || isLikelySmallImageUrl(url)) return true;
+  if (ADA_DERANA_SMALL_RE.test(url)) return true;
+  if (/\/s\d+-w\d+-h\d+/i.test(url)) return true;
+
+  const width = estimateImageWidth(url);
+  if (width > 0 && width < MIN_COVER_WIDTH) return true;
+
+  return false;
+}
+
 /** Skip icons, logos, and tracking pixels as article covers. */
 export function isLikelyJunkCoverUrl(url: string): boolean {
   if (!url) return true;
-  return /logo|icon|avatar|pixel|spacer|1x1|tracking|badge|sprite|advertising\.gif|brand\.jpg|gel\/brand/i.test(
+  return /logo|icon|avatar|pixel|spacer|1x1|tracking|badge|sprite|advertising\.gif|brand\.jpg|gel\/brand|pix\.png|lanka-e-news-log|new-year-\d{4}/i.test(
     url,
   );
+}
+
+function upgradeAdaDeranaPath(path: string): string {
+  return path
+    .replace(/_S\.(jpe?g|png|webp|gif|avif)$/i, "_L.$1")
+    .replace(/_M\.(jpe?g|png|webp|gif|avif)$/i, "_L.$1")
+    .replace(/_t\.(jpe?g|png|webp|gif|avif)$/i, "_L.$1")
+    .replace(/-150\.(jpe?g|png|webp|gif|avif)$/i, "-350.$1")
+    .replace(
+      /-(\d{2,3})\.(jpe?g|png|webp|gif|avif)$/i,
+      (match, size: string, ext: string) =>
+        Number(size) < 400 ? `-350.${ext}` : match,
+    );
 }
 
 function upgradeBloggerPath(path: string): string {
@@ -97,8 +141,9 @@ function upgradeBloggerPath(path: string): string {
   return next;
 }
 
-function upgradeGenericPath(path: string): string {
+function upgradeGenericPath(path: string, host: string): string {
   let next = path.replace(WP_SIZE_SUFFIX_RE, "");
+  next = upgradeAdaDeranaPath(next);
   next = next.replace(BBC_WS_RE, (_match, width) =>
     Number(width) >= 800 ? _match : "/ace/ws/976/",
   );
@@ -108,6 +153,9 @@ function upgradeGenericPath(path: string): string {
   next = next.replace(BBC_NEWS_RE, (_match, width) =>
     Number(width) >= 800 ? _match : "/news/1200/",
   );
+  if (isAdaDeranaCdn(host, next)) {
+    next = upgradeAdaDeranaPath(next);
+  }
   return next;
 }
 
@@ -128,7 +176,7 @@ export function upgradeImageUrl(url: string): string {
     if (isBloggerCdn(u.hostname)) {
       path = upgradeBloggerPath(path);
     } else {
-      path = upgradeGenericPath(path);
+      path = upgradeGenericPath(path, u.hostname);
     }
 
     u.pathname = path;
