@@ -25,44 +25,45 @@ const brandLinks = [
   { href: "/contact", label: "Contact" },
 ];
 
+function FooterBrandStrip({ className = "" }: { className?: string }) {
+  return (
+    <div className={`relative inline-flex max-w-full ${className}`}>
+      <Image
+        src="/logo/footer-image.png"
+        alt="FM Heart brands — The Heart Academy, Pulse Studio, and partners"
+        width={640}
+        height={48}
+        className="h-5 w-auto max-w-[min(100%,280px)] object-contain object-right sm:h-6 sm:max-w-[340px] md:h-7 md:max-w-[400px]"
+        sizes="(max-width: 640px) 280px, 400px"
+        priority={false}
+      />
+      <div className="absolute inset-0 grid grid-cols-6">
+        <a
+          href="https://tha.lk"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block"
+          aria-label="The Heart Academy"
+        />
+        <Link href="/" className="block" aria-label="FM Heart" />
+        <a
+          href="https://wa.me/94771664184"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block"
+          aria-label="Pulse Studio WhatsApp booking"
+        />
+        <span className="block" aria-hidden />
+        <span className="block" aria-hidden />
+        <span className="block" aria-hidden />
+      </div>
+    </div>
+  );
+}
+
 export function Footer() {
   return (
     <footer className="bg-fh-black text-neutral-300">
-      <div className="border-b border-white/10 bg-fh-black">
-        <div className="relative mx-auto flex max-w-2xl justify-center px-2 py-0.5 sm:px-3 sm:py-1 md:max-w-3xl">
-          <Image
-            src="/logo/footer-image.png"
-            alt="FM Heart brands — The Heart Academy, Pulse Studio, and partners"
-            width={800}
-            height={60}
-            className="h-4 w-auto max-w-full object-contain sm:h-5 md:h-7"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 60vw, 560px"
-            priority={false}
-          />
-          {/* Clickable zones for key brands in the strip */}
-          <div className="absolute inset-0 mx-auto grid max-w-2xl grid-cols-6 md:max-w-3xl">
-            <a
-              href="https://tha.lk"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block"
-              aria-label="The Heart Academy"
-            />
-            <Link href="/" className="block" aria-label="FM Heart" />
-            <a
-              href="https://wa.me/94771664184"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block"
-              aria-label="Pulse Studio WhatsApp booking"
-            />
-            <span className="block" aria-hidden />
-            <span className="block" aria-hidden />
-            <span className="block" aria-hidden />
-          </div>
-        </div>
-      </div>
-
       <div className="border-b border-white/10">
         <div className="mx-auto grid max-w-7xl gap-3 px-3 py-3 sm:px-4 sm:py-4 md:grid-cols-[1.2fr_1fr_1fr] md:gap-4 md:py-5">
           <div>
@@ -105,7 +106,7 @@ export function Footer() {
             </ul>
           </div>
 
-          <div>
+          <div className="flex flex-col">
             <h3 className="font-heading text-base font-bold text-white">
               Brands & Business
             </h3>
@@ -136,11 +137,14 @@ export function Footer() {
               <p>{SITE.email}</p>
               <p>{SITE.address}</p>
             </div>
+            <div className="mt-4 flex justify-end md:mt-auto md:pt-4">
+              <FooterBrandStrip />
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-4 text-xs text-neutral-500 md:flex-row">
+      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-3 text-xs text-neutral-500 sm:flex-row sm:items-center">
         <p>© {new Date().getFullYear()} FM Heart. All rights reserved.</p>
         <div className="flex gap-4">
           <Link href="/privacy" className="hover:text-neutral-300">
