@@ -1,5 +1,7 @@
 import { heroSlides as mockSlides } from "@/data/mock";
 import { isFirebaseConfigured } from "@/lib/firebase/client";
+import { upgradeImageUrl } from "@/lib/image-url";
+import { toPlainExcerpt } from "@/lib/plain-text";
 import { listArticles, mapFirebaseError } from "@/services/articles";
 import type { Article } from "@/types";
 import type { CmsArticle } from "@/types/cms";
@@ -54,12 +56,14 @@ function normalizeSlides(raw: unknown): Article[] {
 
 /** Map a published news article to a homepage hero slide. */
 export function cmsToHeroSlide(article: CmsArticle): Article {
+  const excerpt = toPlainExcerpt(article.excerpt, article.body, 280);
   return {
     id: article.id,
     title: article.title,
-    excerpt: article.excerpt || undefined,
+    excerpt: excerpt || undefined,
     category: article.category,
-    image: article.coverImage || "/logo/fmheart-cover.png",
+    image:
+      upgradeImageUrl(article.coverImage || "") || "/logo/fmheart-cover.png",
     publishedAt: article.publishedAt
       ? new Date(article.publishedAt).toLocaleString("si-LK")
       : "දැන්",

@@ -1,7 +1,8 @@
 import type { CmsArticle, CmsArticleInput } from "@/types/cms";
 import { gossipNews, latestNews } from "@/data/mock";
 import { isFirebaseConfigured } from "@/lib/firebase/client";
-import { decodeHtmlEntities } from "@/lib/html-entities";
+import { upgradeImageUrl } from "@/lib/image-url";
+import { toPlainExcerpt, toPlainText } from "@/lib/plain-text";
 import { hasSinhalaNewsText } from "@/lib/sinhala-script";
 
 function slugify(text: string): string {
@@ -36,11 +37,16 @@ function readingTime(body: string): number {
 }
 
 function normalizeArticleText(article: CmsArticle): CmsArticle {
+  const body = toPlainText(article.body);
+  const excerpt =
+    toPlainExcerpt(article.excerpt, body, 400) ||
+    toPlainExcerpt(article.title, body, 400);
   return {
     ...article,
-    title: decodeHtmlEntities(article.title),
-    excerpt: decodeHtmlEntities(article.excerpt),
-    body: decodeHtmlEntities(article.body),
+    title: toPlainText(article.title),
+    excerpt,
+    body,
+    coverImage: upgradeImageUrl(article.coverImage || ""),
   };
 }
 

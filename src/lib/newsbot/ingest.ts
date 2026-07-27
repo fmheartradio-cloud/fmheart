@@ -5,6 +5,17 @@ import {
   hasUndecodedHtmlEntities,
 } from "@/lib/html-entities";
 import {
+  isLikelySmallImageUrl,
+  pickBestCoverUrl,
+  upgradeImageUrl,
+} from "@/lib/image-url";
+import {
+  containsHtmlMarkup,
+  stripHtml,
+  toPlainExcerpt,
+  toPlainText,
+} from "@/lib/plain-text";
+import {
   inferNewsCategory,
   mergeIngestTags,
   shouldUpgradeIngestedCategory,
@@ -77,18 +88,6 @@ type FeedItem = {
   /** True when the article HTML page was fetched successfully. */
   pageFetched?: boolean;
 };
-
-function stripHtml(raw: string): string {
-  return decodeHtmlEntities(
-    raw
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\u00a0/g, " "),
-  )
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 function slugify(title: string): string {
   const ascii = title
@@ -164,8 +163,10 @@ function normalizeArticleUrl(raw: string): string {
 function normalizeCoverUrl(url: string): string {
   const abs = absolutizeUrl(url);
   if (!abs) return "";
-  if (abs.startsWith("http://")) return `https://${abs.slice("http://".length)}`;
-  return abs;
+  const https = abs.startsWith("http://")
+    ? `https://${abs.slice("http://".length)}`
+    : abs;
+  return upgradeImageUrl(https);
 }
 
 function extractItemLink(block: string): string {
@@ -304,16 +305,20 @@ function stripSourceAttribution(body: string): string {
 }
 
 function stripInlineHtml(raw: string): string {
-  return decodeHtmlEntities(
-    raw
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<\/p>/gi, "\n")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\u00a0/g, " ")
-      .replace(/[ \t]+\n/g, "\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .replace(/[ \t]{2,}/g, " "),
-  ).trim();
+  let text = decodeHtmlEntities(raw);
+  for (let pass = 0; pass < 3; pass += 1) {
+    text = decodeHtmlEntities(
+      text
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\u00a0/g, " ")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .replace(/[ \t]{2,}/g, " "),
+    );
+  }
+  return text.trim();
 }
 
 function htmlFragmentToParagraphs(fragment: string): string {
@@ -673,12 +678,18 @@ function resolveCoverImage(
   ogCover: string,
   pageUrl: string,
 ): string {
-  const trimmedRss = rssCover.trim();
-  if (isAdaHost(pageUrl) && pageCover) {
-    if (!trimmedRss) return pageCover;
-    if (shouldUpgradeAdaCover(trimmedRss, pageCover, ogCover)) return pageCover;
+  const rss = normalizeCoverUrl(rssCover);
+  const page = normalizeCoverUrl(pageCover);
+  const og = normalizeCoverUrl(ogCover);
+
+  if (isAdaHost(pageUrl) && page) {
+    if (!rss) return page;
+    if (shouldUpgradeAdaCover(rss, page, og)) return page;
   }
-  return trimmedRss || pageCover;
+
+  if (og && (!rss || isLikelySmallImageUrl(rss))) return og;
+  if (page && (!rss || isLikelySmallImageUrl(rss))) return page;
+  return pickBestCoverUrl(rss, page, og);
 }
 
 async function fetchArticlePageData(sourceUrl: string): Promise<ArticlePageData | null> {
@@ -789,14 +800,16 @@ function parseRssItems(xml: string, limit: number): FeedItem[] {
   for (const chunk of chunks.slice(0, limit)) {
     const title = stripHtml(xmlTagInner(chunk, "title"));
     const link = extractItemLink(chunk);
-    const description = stripHtml(xmlTagInner(chunk, "description"));
-    const content = stripHtml(xmlTagInner(chunk, "content:encoded"));
+    const descriptionRaw = unwrapCdata(xmlTagInner(chunk, "description"));
+    const contentRaw = unwrapCdata(xmlTagInner(chunk, "content:encoded"));
+    const description = stripHtml(descriptionRaw);
+    const content = stripHtml(contentRaw);
     if (!title) continue;
     const body = (content || description || title).slice(0, 4000);
     items.push({
       title,
       sourceUrl: link,
-      excerpt: (description || title).slice(0, 400),
+      excerpt: toPlainExcerpt(description, body, 400) || title,
       body,
       coverImage: firstImageFromXml(chunk, link, feedBase),
       rssCategories: extractRssCategories(chunk),
@@ -867,7 +880,10 @@ async function enrichFeedItemFromPage(item: FeedItem): Promise<FeedItem> {
       pageData.ogCoverImage,
       item.sourceUrl,
     ),
-    excerpt: item.excerpt || pageData.body.slice(0, 400) || title,
+    excerpt:
+      toPlainExcerpt(item.excerpt, pageData.body, 400) ||
+      toPlainExcerpt(title, pageData.body, 400) ||
+      title,
     body:
       needsBody && pageData.body && !bodyLooksLikeTitle(pageData.body, title)
         ? pageData.body
@@ -923,12 +939,23 @@ async function fetchRss(url: string, limit: number): Promise<FeedItem[]> {
 
   return mapWithConcurrency(items, 3, async (item) => {
     if (!item.sourceUrl) return item;
-    const needsCover = !item.coverImage;
-    const needsBody = isBodyTooShort(item.body, item.title);
-    if (!needsCover && !needsBody) return item;
+    const needsCover =
+      !item.coverImage || isLikelySmallImageUrl(item.coverImage);
+    const needsBody =
+      isBodyTooShort(item.body, item.title) ||
+      containsHtmlMarkup(item.body);
+    const needsExcerpt = containsHtmlMarkup(item.excerpt);
+    if (!needsCover && !needsBody && !needsExcerpt) return item;
 
     const pageData = await fetchArticlePageData(item.sourceUrl);
     if (!pageData) return item;
+
+    const body =
+      needsBody && pageData.body && !bodyLooksLikeTitle(pageData.body, item.title)
+        ? pageData.body
+        : containsHtmlMarkup(item.body)
+          ? toPlainText(pageData.body || item.body)
+          : item.body;
 
     return {
       ...item,
@@ -939,10 +966,8 @@ async function fetchRss(url: string, limit: number): Promise<FeedItem[]> {
         pageData.ogCoverImage,
         item.sourceUrl,
       ),
-      body:
-        needsBody && pageData.body && !bodyLooksLikeTitle(pageData.body, item.title)
-          ? pageData.body
-          : item.body,
+      excerpt: toPlainExcerpt(item.excerpt, body, 400) || item.title,
+      body,
     };
   });
 }
@@ -1032,11 +1057,21 @@ export async function runNewsIngest(options?: {
         if (!dupHash.empty) {
           const existing = dupHash.docs[0];
           const existingData = existing.data();
+          const existingExcerpt = String(existingData.excerpt || "").trim();
           const existingCover = String(existingData.coverImage || "").trim();
           const existingBody = String(existingData.body || "").trim();
           const needsCover = !existingCover;
-          const needsBody = bodyLooksLikeTitle(existingBody, title);
+          const needsBody =
+            bodyLooksLikeTitle(existingBody, title) ||
+            containsHtmlMarkup(existingBody);
           const needsEntityFix = hasUndecodedHtmlEntities(existingBody);
+          const needsExcerptFix =
+            containsHtmlMarkup(existingExcerpt) ||
+            hasUndecodedHtmlEntities(existingExcerpt);
+          const needsCoverUpgrade =
+            Boolean(existingCover) &&
+            (isLikelySmallImageUrl(existingCover) ||
+              upgradeImageUrl(existingCover) !== existingCover);
           const adaCoverUpgrade =
             Boolean(existingCover) && isAdaHost(item.sourceUrl);
           const updates: Record<string, string | number | string[]> = {};
@@ -1044,7 +1079,12 @@ export async function runNewsIngest(options?: {
           let pageData: ArticlePageData | null = null;
           if (
             item.sourceUrl &&
-            (needsCover || needsBody || needsEntityFix || adaCoverUpgrade)
+            (needsCover ||
+              needsBody ||
+              needsEntityFix ||
+              needsExcerptFix ||
+              needsCoverUpgrade ||
+              adaCoverUpgrade)
           ) {
             pageData = await fetchArticlePageData(item.sourceUrl);
           }
@@ -1058,6 +1098,16 @@ export async function runNewsIngest(options?: {
                 item.sourceUrl,
               ) || "";
             if (cover) updates.coverImage = cover;
+          } else if (needsCoverUpgrade) {
+            const upgraded = resolveCoverImage(
+              existingCover,
+              pageData?.coverImage || "",
+              pageData?.ogCoverImage || "",
+              item.sourceUrl,
+            );
+            if (upgraded && upgraded !== existingCover) {
+              updates.coverImage = upgraded;
+            }
           } else if (
             adaCoverUpgrade &&
             pageData?.coverImage &&
@@ -1070,8 +1120,23 @@ export async function runNewsIngest(options?: {
             updates.coverImage = pageData.coverImage;
           }
 
+          if (needsExcerptFix) {
+            const bodyPlain = toPlainText(
+              String(updates.body || existingBody || item.body),
+            );
+            const fixedExcerpt = toPlainExcerpt(
+              existingExcerpt,
+              bodyPlain,
+              400,
+            );
+            if (fixedExcerpt && fixedExcerpt !== existingExcerpt) {
+              updates.excerpt = fixedExcerpt;
+              updates.seoDescription = fixedExcerpt;
+            }
+          }
+
           if (needsBody) {
-            let fullerBody = item.body;
+            let fullerBody = toPlainText(item.body);
             if (bodyLooksLikeTitle(fullerBody, title)) {
               fullerBody = pageData?.body || fullerBody;
             }
@@ -1089,6 +1154,12 @@ export async function runNewsIngest(options?: {
             ) {
               updates.body = capBody(pageData.body);
               updates.readingTimeMin = readingTime(String(updates.body));
+            } else if (containsHtmlMarkup(existingBody)) {
+              const fixedBody = toPlainText(existingBody);
+              if (fixedBody && fixedBody !== existingBody) {
+                updates.body = capBody(fixedBody);
+                updates.readingTimeMin = readingTime(String(updates.body));
+              }
             }
           } else if (needsEntityFix) {
             const fixedBody = decodeHtmlEntities(existingBody);
@@ -1153,16 +1224,24 @@ export async function runNewsIngest(options?: {
 
         const body = resolveArticleBody(item, title);
         const category = inferItemCategory(src, item);
+        const excerpt = toPlainExcerpt(item.excerpt, body, 400) || title;
+        const coverImage =
+          resolveCoverImage(
+            item.coverImage,
+            "",
+            "",
+            item.sourceUrl,
+          ) || upgradeImageUrl(item.coverImage || "");
 
         const now = new Date().toISOString();
         const ref = await db.collection("articles").add({
           type: "news",
           title,
           slug: slugify(title),
-          excerpt: item.excerpt || title,
-          body,
+          excerpt,
+          body: toPlainText(body),
           category,
-          coverImage: item.coverImage || "",
+          coverImage,
           author: `FM Heart · ${src.name}`,
           status: "published",
           tags: [src.name, category],
@@ -1172,7 +1251,7 @@ export async function runNewsIngest(options?: {
           updatedAt: now,
           publishedAt: now,
           seoTitle: title,
-          seoDescription: item.excerpt || title,
+          seoDescription: excerpt,
           source: src.name,
           sourceUrl: item.sourceUrl,
           sourceHash: hash,
