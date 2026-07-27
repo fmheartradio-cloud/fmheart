@@ -76,13 +76,31 @@ export function containsHtmlMarkup(text: string): boolean {
   );
 }
 
+/** Strip WordPress / Yoast "The post … appeared first on …" footers. */
+export function stripSyndicationFooter(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(
+      /\s*The\s+post\s+[\s\S]+?\s+appeared\s+first\s+on\s+Neth\s+News\.?\s*/gi,
+      " ",
+    )
+    .replace(
+      /\s*The\s+post\s+[\s\S]+?\s+appeared\s+first\s+on\s+[^\n.]+\.?\s*/gi,
+      " ",
+    )
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 /** Plain text for titles/body — strips HTML when present, always decodes entities. */
 export function toPlainText(raw: string): string {
   if (!raw) return "";
-  if (containsHtmlMarkup(raw)) return stripHtml(raw);
-  const plain = decodeHtmlEntities(raw).replace(/\s+/g, " ").trim();
-  if (looksLikeHtmlFragment(plain)) return "";
-  return plain;
+  const base = containsHtmlMarkup(raw)
+    ? stripHtml(raw)
+    : decodeHtmlEntities(raw).replace(/\s+/g, " ").trim();
+  if (!base || looksLikeHtmlFragment(base)) return "";
+  return stripSyndicationFooter(base);
 }
 
 export function toPlainExcerpt(

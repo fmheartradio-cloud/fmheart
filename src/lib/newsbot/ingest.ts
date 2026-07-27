@@ -14,6 +14,7 @@ import {
   containsHtmlMarkup,
   looksLikeHtmlFragment,
   stripHtml,
+  stripSyndicationFooter,
   toPlainExcerpt,
   toPlainText,
 } from "@/lib/plain-text";
@@ -303,7 +304,11 @@ function stripSourceAttribution(body: string): string {
     "",
   );
   text = text.replace(/\n*(?:මූලාශ්‍ර|මුලාශ්‍ර|Source\s*:)[^\n]*/giu, "");
-  return text.trim();
+  return stripSyndicationFooter(text);
+}
+
+function bodyHasNethAttribution(body: string): boolean {
+  return /appeared\s+first\s+on\s+Neth\s+News/i.test(body);
 }
 
 function stripInlineHtml(raw: string): string {
@@ -1108,7 +1113,8 @@ export async function runNewsIngest(options?: {
           const needsCover = !existingCover;
           const needsBody =
             bodyLooksLikeTitle(existingBody, title) ||
-            containsHtmlMarkup(existingBody);
+            containsHtmlMarkup(existingBody) ||
+            bodyHasNethAttribution(existingBody);
           const needsEntityFix = hasUndecodedHtmlEntities(existingBody);
           const needsExcerptFix =
             containsHtmlMarkup(existingExcerpt) ||
@@ -1190,7 +1196,17 @@ export async function runNewsIngest(options?: {
             if (bodyLooksLikeTitle(fullerBody, title)) {
               fullerBody = pageData?.body || fullerBody;
             }
+            fullerBody = stripSourceAttribution(fullerBody);
+            const cleanedExisting = stripSourceAttribution(existingBody);
             if (
+              bodyHasNethAttribution(existingBody) &&
+              cleanedExisting &&
+              cleanedExisting !== existingBody &&
+              !bodyLooksLikeTitle(cleanedExisting, title)
+            ) {
+              updates.body = capBody(cleanedExisting);
+              updates.readingTimeMin = readingTime(String(updates.body));
+            } else if (
               fullerBody &&
               fullerBody.length > existingBody.length &&
               !bodyLooksLikeTitle(fullerBody, title)
@@ -1204,8 +1220,8 @@ export async function runNewsIngest(options?: {
             ) {
               updates.body = capBody(pageData.body);
               updates.readingTimeMin = readingTime(String(updates.body));
-            } else if (containsHtmlMarkup(existingBody)) {
-              const fixedBody = toPlainText(existingBody);
+            } else if (containsHtmlMarkup(existingBody) || bodyHasNethAttribution(existingBody)) {
+              const fixedBody = stripSourceAttribution(toPlainText(existingBody));
               if (fixedBody && fixedBody !== existingBody) {
                 updates.body = capBody(fixedBody);
                 updates.readingTimeMin = readingTime(String(updates.body));
