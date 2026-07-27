@@ -1,7 +1,9 @@
+# Auto-ingest every 10 minutes (GitHub UTC). Also keep workflow_dispatch for manual runs.
 name: Newsbot cron
 
 on:
   schedule:
+    # Every 10 minutes — GitHub may delay a few minutes under load
     - cron: "*/10 * * * *"
   workflow_dispatch:
 
