@@ -46,9 +46,9 @@ export default async function HomePage() {
 
       <main className="overflow-x-hidden">
         <div className="mx-auto w-full max-w-7xl px-3 md:px-4">
-          <div className="grid w-full lg:grid-cols-[1fr_320px]">
+          <div className="grid w-full max-w-full grid-cols-1 gap-0 lg:grid-cols-[1fr_320px]">
             <HeroSlider slides={heroSlides} />
-            <div className="min-h-[320px] w-full min-w-0 lg:min-h-full">
+            <div className="min-h-[320px] w-full min-w-0 max-w-full lg:min-h-full">
               <LiveRadioPlayer />
             </div>
           </div>
@@ -65,8 +65,8 @@ export default async function HomePage() {
             )}
           </div>
 
-          <div className="grid w-full gap-8 pb-8 lg:grid-cols-[1fr_300px]">
-            <div className="min-w-0 space-y-10">
+          <div className="grid w-full max-w-full grid-cols-1 gap-8 pb-8 lg:grid-cols-[1fr_300px]">
+            <div className="min-w-0 max-w-full space-y-10 overflow-x-clip">
               <NewsGrid
                 title="නවතම ප්‍රවෘත්ති"
                 articles={newsCards}

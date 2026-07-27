@@ -27,7 +27,7 @@ export function HeroSlider({ slides: initialSlides }: HeroSliderProps) {
   if (!slide) return null;
 
   return (
-    <section className="relative min-h-[280px] overflow-hidden bg-fh-black md:min-h-[420px] lg:min-h-[480px]">
+    <section className="relative min-h-[280px] w-full max-w-full min-w-0 overflow-hidden bg-fh-black md:min-h-[420px] lg:min-h-[480px]">
       {slides.map((item, i) => (
         <div
           key={item.id}
@@ -41,7 +41,7 @@ export function HeroSlider({ slides: initialSlides }: HeroSliderProps) {
             fill
             priority={i === 0}
             className="object-cover"
-            sizes="(max-width: 1024px) 100vw, 70vw"
+            sizes="(max-width: 1024px) calc(100vw - 1.5rem), 70vw"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/20" />
         </div>
