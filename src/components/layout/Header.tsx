@@ -53,12 +53,10 @@ export function Header() {
             className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-fh-red to-fh-red-dark px-3 py-2 text-white shadow-sm transition hover:brightness-110 md:px-4"
             aria-label={isPlaying ? "Pause live radio" : "Play live radio"}
           >
-            <span className="relative flex h-2.5 w-2.5">
-              <span
-                className={`absolute inline-flex h-full w-full rounded-full bg-white opacity-75 ${isPlaying ? "animate-live" : ""}`}
-              />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
-            </span>
+            <span
+              className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-white animate-live"
+              aria-hidden
+            />
             <span className="font-heading text-sm font-bold tracking-wide md:text-base">
               {isLoading ? "LOADING…" : isPlaying ? "ON AIR" : "LIVE RADIO"}
             </span>
