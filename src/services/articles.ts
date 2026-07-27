@@ -1,7 +1,7 @@
 import type { CmsArticle, CmsArticleInput } from "@/types/cms";
 import { gossipNews, latestNews } from "@/data/mock";
 import { isFirebaseConfigured } from "@/lib/firebase/client";
-import { upgradeImageUrl } from "@/lib/image-url";
+import { finalizeCoverUrl, upgradeImageUrl } from "@/lib/image-url";
 import { toPlainExcerpt, toPlainText } from "@/lib/plain-text";
 import { hasSinhalaNewsText } from "@/lib/sinhala-script";
 
@@ -46,7 +46,7 @@ function normalizeArticleText(article: CmsArticle): CmsArticle {
     title: toPlainText(article.title),
     excerpt,
     body,
-    coverImage: upgradeImageUrl(article.coverImage || ""),
+    coverImage: finalizeCoverUrl(article.coverImage || ""),
   };
 }
 

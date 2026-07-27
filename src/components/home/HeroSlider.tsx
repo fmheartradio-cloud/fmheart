@@ -40,6 +40,7 @@ export function HeroSlider({ slides: initialSlides }: HeroSliderProps) {
             alt=""
             fill
             priority={i === 0}
+            unoptimized
             className="object-cover"
             sizes="(max-width: 1024px) calc(100vw - 1.5rem), 70vw"
           />

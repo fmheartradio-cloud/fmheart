@@ -5,6 +5,8 @@ import {
   hasUndecodedHtmlEntities,
 } from "@/lib/html-entities";
 import {
+  finalizeCoverUrl,
+  isLikelyJunkCoverUrl,
   isLikelySmallImageUrl,
   pickBestCoverUrl,
   upgradeImageUrl,
@@ -167,7 +169,14 @@ function normalizeCoverUrl(url: string): string {
   const https = abs.startsWith("http://")
     ? `https://${abs.slice("http://".length)}`
     : abs;
-  return upgradeImageUrl(https);
+  return finalizeCoverUrl(https);
+}
+
+function coverNeedsPageFetch(cover: string): boolean {
+  const trimmed = cover.trim();
+  if (!trimmed) return true;
+  if (isLikelyJunkCoverUrl(trimmed)) return true;
+  return isLikelySmallImageUrl(trimmed);
 }
 
 function extractItemLink(block: string): string {
@@ -220,13 +229,24 @@ function imageFromHtmlFragment(
   feedBase: string,
 ): string {
   const decoded = decodeHtmlEntities(unwrapCdata(html));
-  for (const match of decoded.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)) {
-    const src = match[1];
-    if (!src || /^data:/i.test(src)) continue;
+  const candidates: string[] = [];
+
+  for (const match of decoded.matchAll(/<img[^>]+>/gi)) {
+    const tag = match[0];
+    const widthAttr = tag.match(/\bwidth=["']?(\d+)/i)?.[1];
+    if (widthAttr && Number(widthAttr) > 0 && Number(widthAttr) < 200) continue;
+
+    const src =
+      tag.match(/\bsrc=["']([^"']+)["']/i)?.[1] ||
+      tag.match(/\bdata-src=["']([^"']+)["']/i)?.[1] ||
+      tag.match(/\bdata-original=["']([^"']+)["']/i)?.[1];
+    if (!src || /^data:/i.test(src) || isJunkImageUrl(src)) continue;
+
     const abs = absolutizeUrl(src, itemLink, feedBase);
-    if (isImageUrl(abs)) return abs;
+    if (isImageUrl(abs)) candidates.push(abs);
   }
-  return "";
+
+  return pickBestCoverUrl(...candidates);
 }
 
 function firstImageFromXml(
@@ -261,8 +281,7 @@ function firstImageFromXml(
     if (fromHtml) candidates.push(fromHtml);
   }
 
-  const best = candidates.find((url) => Boolean(url)) || "";
-  return best ? normalizeCoverUrl(best) : "";
+  return normalizeCoverUrl(pickBestCoverUrl(...candidates));
 }
 
 function normalizeBodyText(raw: string): string {
@@ -688,9 +707,11 @@ function resolveCoverImage(
     if (shouldUpgradeAdaCover(rss, page, og)) return page;
   }
 
+  const best = pickBestCoverUrl(rss, page, og);
+  if (best) return best;
   if (og && (!rss || isLikelySmallImageUrl(rss))) return og;
   if (page && (!rss || isLikelySmallImageUrl(rss))) return page;
-  return pickBestCoverUrl(rss, page, og);
+  return normalizeCoverUrl(rss);
 }
 
 async function fetchArticlePageData(sourceUrl: string): Promise<ArticlePageData | null> {
@@ -863,9 +884,14 @@ function parseLankaENewsList(html: string, limit: number): FeedItem[] {
 async function enrichFeedItemFromPage(item: FeedItem): Promise<FeedItem> {
   if (!item.sourceUrl) return item;
   const needsTitle = !item.title.trim();
-  const needsCover = !item.coverImage;
+  const needsCover = coverNeedsPageFetch(item.coverImage);
   const needsBody = isBodyTooShort(item.body, item.title || item.sourceUrl);
-  if (!needsTitle && !needsCover && !needsBody) return item;
+  if (!needsTitle && !needsCover && !needsBody) {
+    return {
+      ...item,
+      coverImage: normalizeCoverUrl(item.coverImage),
+    };
+  }
 
   const pageData = await fetchArticlePageData(item.sourceUrl);
   if (!pageData) return item;
@@ -940,8 +966,7 @@ async function fetchRss(url: string, limit: number): Promise<FeedItem[]> {
 
   return mapWithConcurrency(items, 3, async (item) => {
     if (!item.sourceUrl) return item;
-    const needsCover =
-      !item.coverImage || isLikelySmallImageUrl(item.coverImage);
+    const needsCover = coverNeedsPageFetch(item.coverImage);
     const needsBody =
       isBodyTooShort(item.body, item.title) ||
       containsHtmlMarkup(item.body);
@@ -949,7 +974,12 @@ async function fetchRss(url: string, limit: number): Promise<FeedItem[]> {
       containsHtmlMarkup(item.excerpt) ||
       looksLikeHtmlFragment(item.excerpt) ||
       /<img\b/i.test(item.excerpt);
-    if (!needsCover && !needsBody && !needsExcerpt) return item;
+    if (!needsCover && !needsBody && !needsExcerpt) {
+      return {
+        ...item,
+        coverImage: normalizeCoverUrl(item.coverImage),
+      };
+    }
 
     const pageData = await fetchArticlePageData(item.sourceUrl);
     if (!pageData) return item;
@@ -1076,7 +1106,7 @@ export async function runNewsIngest(options?: {
             /<img\b/i.test(existingExcerpt);
           const needsCoverUpgrade =
             Boolean(existingCover) &&
-            (isLikelySmallImageUrl(existingCover) ||
+            (coverNeedsPageFetch(existingCover) ||
               upgradeImageUrl(existingCover) !== existingCover);
           const adaCoverUpgrade =
             Boolean(existingCover) && isAdaHost(item.sourceUrl);
@@ -1103,13 +1133,16 @@ export async function runNewsIngest(options?: {
                 pageData?.ogCoverImage || "",
                 item.sourceUrl,
               ) || "";
-            if (cover) updates.coverImage = cover;
+            const finalized = finalizeCoverUrl(cover);
+            if (finalized) updates.coverImage = finalized;
           } else if (needsCoverUpgrade) {
-            const upgraded = resolveCoverImage(
-              existingCover,
-              pageData?.coverImage || "",
-              pageData?.ogCoverImage || "",
-              item.sourceUrl,
+            const upgraded = finalizeCoverUrl(
+              resolveCoverImage(
+                existingCover,
+                pageData?.coverImage || "",
+                pageData?.ogCoverImage || "",
+                item.sourceUrl,
+              ),
             );
             if (upgraded && upgraded !== existingCover) {
               updates.coverImage = upgraded;
@@ -1123,7 +1156,8 @@ export async function runNewsIngest(options?: {
               pageData.ogCoverImage,
             )
           ) {
-            updates.coverImage = pageData.coverImage;
+            const finalized = finalizeCoverUrl(pageData.coverImage);
+            if (finalized) updates.coverImage = finalized;
           }
 
           if (needsExcerptFix) {
@@ -1230,13 +1264,14 @@ export async function runNewsIngest(options?: {
         const body = resolveArticleBody(item, title);
         const category = inferItemCategory(src, item);
         const excerpt = toPlainExcerpt(item.excerpt, body, 400) || title;
-        const coverImage =
+        const coverImage = finalizeCoverUrl(
           resolveCoverImage(
             item.coverImage,
             "",
             "",
             item.sourceUrl,
-          ) || upgradeImageUrl(item.coverImage || "");
+          ) || item.coverImage,
+        );
 
         const now = new Date().toISOString();
         const ref = await db.collection("articles").add({

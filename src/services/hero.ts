@@ -1,6 +1,6 @@
 import { heroSlides as mockSlides } from "@/data/mock";
 import { isFirebaseConfigured } from "@/lib/firebase/client";
-import { upgradeImageUrl } from "@/lib/image-url";
+import { finalizeCoverUrl, upgradeImageUrl } from "@/lib/image-url";
 import { toHeroExcerpt } from "@/lib/plain-text";
 import { listArticles, mapFirebaseError } from "@/services/articles";
 import type { Article } from "@/types";
@@ -63,7 +63,7 @@ export function cmsToHeroSlide(article: CmsArticle): Article {
     excerpt: excerpt || undefined,
     category: article.category,
     image:
-      upgradeImageUrl(article.coverImage || "") || "/logo/fmheart-cover.png",
+      finalizeCoverUrl(article.coverImage || "") || "/logo/fmheart-cover.png",
     publishedAt: article.publishedAt
       ? new Date(article.publishedAt).toLocaleString("si-LK")
       : "දැන්",
