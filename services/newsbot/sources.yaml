@@ -32,6 +32,6 @@ sources:
     category: දේශීය
     active: true
 
-# Bot writes drafts for admin review (safer for copyright/quality)
-default_status: draft
+# Bot auto-publishes ingested articles (manual admin posts stay draft until published)
+default_status: published
 max_per_source: 8

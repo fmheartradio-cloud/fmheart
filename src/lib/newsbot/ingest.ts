@@ -962,6 +962,7 @@ export type IngestResult = {
   created: number;
   skipped: number;
   backfilled: number;
+  publishedDrafts: number;
   categoriesUpdated: number;
   error?: string;
 };
@@ -1004,6 +1005,7 @@ export async function runNewsIngest(options?: {
       created: 0,
       skipped: 0,
       backfilled: 0,
+      publishedDrafts: 0,
       categoriesUpdated: 0,
     };
     try {
@@ -1121,10 +1123,19 @@ export async function runNewsIngest(options?: {
             );
           }
 
+          if (
+            existingData.ingestedBy === "newsbot" &&
+            existingData.status === "draft"
+          ) {
+            updates.status = "published";
+            updates.publishedAt = new Date().toISOString();
+          }
+
           if (Object.keys(updates).length > 0) {
             updates.updatedAt = new Date().toISOString();
             await existing.ref.update(updates);
             row.backfilled += 1;
+            if ("status" in updates) row.publishedDrafts += 1;
             if ("category" in updates) row.categoriesUpdated += 1;
           }
           row.skipped += 1;
@@ -1153,13 +1164,13 @@ export async function runNewsIngest(options?: {
           category,
           coverImage: item.coverImage || "",
           author: `FM Heart · ${src.name}`,
-          status: "draft",
+          status: "published",
           tags: [src.name, category],
           readingTimeMin: readingTime(body),
           views: 0,
           createdAt: now,
           updatedAt: now,
-          publishedAt: null,
+          publishedAt: now,
           seoTitle: title,
           seoDescription: item.excerpt || title,
           source: src.name,

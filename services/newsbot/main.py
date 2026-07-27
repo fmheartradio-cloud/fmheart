@@ -34,7 +34,7 @@ def main() -> int:
         cfg = yaml.safe_load(f) or {}
 
     sources = [s for s in (cfg.get("sources") or []) if s.get("active", True)]
-    status = cfg.get("default_status") or "draft"
+    status = cfg.get("default_status") or "published"
     max_per = int(cfg.get("max_per_source") or 8)
 
     if not sources:
@@ -81,7 +81,7 @@ def main() -> int:
                 doc_id = save_draft(entry)
                 if doc_id:
                     created += 1
-                    print(f"  + draft {doc_id}: {entry['title'][:60]}")
+                    print(f"  + {status} {doc_id}: {entry['title'][:60]}")
                 else:
                     skipped += 1
             except Exception as err:

@@ -188,6 +188,10 @@ def save_draft(item: dict[str, Any]) -> str | None:
                 inferred_category,
             )
 
+        if existing.get("ingestedBy") == "newsbot" and existing.get("status") == "draft":
+            updates["status"] = "published"
+            updates["publishedAt"] = datetime.now(tz=timezone.utc).isoformat()
+
         if updates:
             now = datetime.now(tz=timezone.utc).isoformat()
             updates["updatedAt"] = now
@@ -204,7 +208,7 @@ def save_draft(item: dict[str, Any]) -> str | None:
     body = cap_body((item.get("body") or excerpt).strip())
     source_name = item.get("source") or "Unknown"
 
-    status = item.get("status") or "draft"
+    status = item.get("status") or "published"
     payload = {
         "type": "news",
         "title": title,

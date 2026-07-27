@@ -112,7 +112,8 @@ export default function AdminArticlesPage() {
           Articles
         </h1>
         <p className="mt-1 text-sm text-fh-muted">
-          Manual posts + newsbot drafts. Bot items stay draft until you Publish.
+          Manual posts and newsbot articles. Bot ingests publish automatically;
+          manual drafts stay draft until you Publish.
           {draftCount > 0 ? ` (${draftCount} drafts waiting)` : ""}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
