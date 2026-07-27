@@ -29,18 +29,18 @@ export function Footer() {
   return (
     <footer className="bg-fh-black text-neutral-300">
       <div className="border-b border-white/10 bg-fh-black">
-        <div className="relative mx-auto flex max-w-4xl justify-center px-3 py-1.5 md:px-4 md:py-2">
+        <div className="relative mx-auto flex max-w-3xl justify-center px-3 py-1 md:px-4 md:py-1.5">
           <Image
             src="/logo/footer-image.png"
             alt="FM Heart brands — The Heart Academy, Pulse Studio, and partners"
-            width={1000}
-            height={100}
-            className="h-8 w-auto max-w-full object-contain sm:h-9 md:h-10"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 800px"
+            width={900}
+            height={80}
+            className="h-6 w-auto max-w-full object-contain sm:h-7 md:h-8"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 70vw, 640px"
             priority={false}
           />
           {/* Clickable zones for key brands in the strip */}
-          <div className="absolute inset-0 mx-auto grid max-w-4xl grid-cols-6">
+          <div className="absolute inset-0 mx-auto grid max-w-3xl grid-cols-6">
             <a
               href="https://tha.lk"
               target="_blank"
@@ -64,7 +64,7 @@ export function Footer() {
       </div>
 
       <div className="border-b border-white/10">
-        <div className="mx-auto grid max-w-7xl gap-4 px-4 py-5 md:grid-cols-[1.2fr_1fr_1fr] md:gap-5 md:py-6">
+        <div className="mx-auto grid max-w-7xl gap-3 px-4 py-4 md:grid-cols-[1.2fr_1fr_1fr] md:gap-4 md:py-5">
           <div>
             <Logo variant="compact" />
             <p className="mt-4 max-w-sm font-feature text-sm leading-relaxed text-neutral-400">
