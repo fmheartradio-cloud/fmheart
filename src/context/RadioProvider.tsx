@@ -154,6 +154,8 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     sourceRef.current = null;
   }, []);
 
+  const captureCheckTimer = useRef<number | null>(null);
+
   const ensureCaptureAnalyser = useCallback(async () => {
     const audio = audioRef.current;
     if (!audio || appleRef.current) return;
@@ -168,7 +170,10 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         : typeof el.mozCaptureStream === "function"
           ? el.mozCaptureStream()
           : null;
-    if (!capture) return;
+    if (!capture) {
+      setSpectrumMode("simulated");
+      return;
+    }
 
     const Ctx =
       window.AudioContext ||
@@ -195,12 +200,44 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     disconnectCaptureAnalyser();
     try {
       const source = ctx.createMediaStreamSource(capture);
-      // Analyse only — element already outputs audible audio
       source.connect(analyserRef.current);
       sourceRef.current = source;
     } catch (err) {
       console.warn("[radio] capture analyser failed:", err);
+      setSpectrumMode("simulated");
+      return;
     }
+
+    // Verify we actually get non-zero FFT data after a short delay.
+    // CORS-blocked captureStream produces silent/zero-filled buffers.
+    if (captureCheckTimer.current != null) {
+      window.clearTimeout(captureCheckTimer.current);
+    }
+    let checks = 0;
+    const maxChecks = 4;
+    const checkInterval = 800;
+    const doCheck = () => {
+      captureCheckTimer.current = null;
+      checks++;
+      const an = analyserRef.current;
+      if (!an) return;
+      const buf = new Uint8Array(an.frequencyBinCount);
+      an.getByteFrequencyData(buf);
+      let energy = 0;
+      for (let i = 0; i < buf.length; i++) energy += buf[i]!;
+      if (energy > 0) {
+        setSpectrumMode("realtime");
+        return;
+      }
+      if (checks < maxChecks) {
+        captureCheckTimer.current = window.setTimeout(doCheck, checkInterval);
+      } else {
+        console.warn("[radio] captureStream silent (CORS), falling back to simulated spectrum");
+        disconnectCaptureAnalyser();
+        setSpectrumMode("simulated");
+      }
+    };
+    captureCheckTimer.current = window.setTimeout(doCheck, checkInterval);
   }, [disconnectCaptureAnalyser]);
 
   /** Legacy proxy + MediaElementSource path (fallback only). */
