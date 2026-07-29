@@ -47,17 +47,10 @@ export function articlePublicUrl(input: {
 export function buildFacebookMessage(input: FacebookPostInput): string {
   const url = articlePublicUrl(input);
   const title = input.title.trim().slice(0, 180);
-  const excerpt = (input.excerpt || "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .slice(0, 140);
 
   const lines: string[] = [];
   if (input.breaking) lines.push("🚨 BREAKING NEWS", "");
   lines.push(title);
-  if (excerpt && excerpt !== title) {
-    lines.push("", excerpt);
-  }
   lines.push("", "👉 වැඩි විස්තර:", url, "", "#FMHeart #SriLanka");
   return lines.join("\n");
 }
