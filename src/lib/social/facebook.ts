@@ -10,6 +10,7 @@ export type FacebookPostInput = {
   type?: "news" | "gossip";
   category?: string;
   breaking?: boolean;
+  coverImage?: string;
 };
 
 export type FacebookPostResult = {
@@ -61,8 +62,8 @@ export function buildFacebookMessage(input: FacebookPostInput): string {
   return lines.join("\n");
 }
 
-async function graphFeedPost(
-  pageId: string,
+async function graphPost(
+  path: string,
   token: string,
   fields: Record<string, string>,
 ): Promise<FacebookPostResult | FacebookPostError> {
@@ -72,7 +73,7 @@ async function graphFeedPost(
   });
 
   try {
-    const res = await fetch(`${GRAPH_BASE}/${encodeURIComponent(pageId)}/feed`, {
+    const res = await fetch(`${GRAPH_BASE}/${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
@@ -81,6 +82,7 @@ async function graphFeedPost(
 
     const data = (await res.json()) as {
       id?: string;
+      post_id?: string;
       error?: { message?: string; type?: string; code?: number };
     };
 
@@ -93,10 +95,11 @@ async function graphFeedPost(
       };
     }
 
+    const postId = data.post_id || data.id;
     return {
       ok: true,
-      postId: data.id,
-      postUrl: `https://www.facebook.com/${data.id}`,
+      postId,
+      postUrl: `https://www.facebook.com/${postId}`,
     };
   } catch (err) {
     return {
@@ -106,7 +109,17 @@ async function graphFeedPost(
   }
 }
 
-/** Publish a Page post (message + URL). Avoids Graph `link` scrape which can fail. */
+function absoluteCoverUrl(coverImage?: string): string | null {
+  const raw = (coverImage || "").trim();
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith("/")) {
+    return `${SITE.url.replace(/\/$/, "")}${raw}`;
+  }
+  return null;
+}
+
+/** Publish a Page post with cover photo when possible. */
 export async function postArticleToFacebookPage(
   input: FacebookPostInput,
 ): Promise<FacebookPostResult | FacebookPostError> {
@@ -120,10 +133,24 @@ export async function postArticleToFacebookPage(
     };
   }
 
-  // Do NOT send Graph `link=` — FB scrapes the page and often returns
-  // "Please reduce the amount of data you're asking for".
-  const full = await graphFeedPost(pageId, token, {
-    message: buildFacebookMessage(input),
+  const message = buildFacebookMessage(input);
+  const coverUrl = absoluteCoverUrl(input.coverImage);
+
+  // Prefer photo post so the cover image appears on the Page
+  if (coverUrl) {
+    const photo = await graphPost(`${encodeURIComponent(pageId)}/photos`, token, {
+      url: coverUrl,
+      caption: message,
+      published: "true",
+    });
+    if (photo.ok) return photo;
+    // Fall through to text post if Facebook can't fetch the image URL
+    console.warn("[facebook] photo post failed, falling back to text:", photo.error);
+  }
+
+  // Text-only fallback (no Graph `link=` scrape — that triggers reduce-data errors)
+  const full = await graphPost(`${encodeURIComponent(pageId)}/feed`, token, {
+    message,
   });
   if (full.ok) return full;
 
@@ -133,10 +160,9 @@ export async function postArticleToFacebookPage(
     );
   if (!reduce) return full;
 
-  // Minimal retry: title + URL only
   const url = articlePublicUrl(input);
   const shortTitle = input.title.trim().slice(0, 120);
-  return graphFeedPost(pageId, token, {
+  return graphPost(`${encodeURIComponent(pageId)}/feed`, token, {
     message: `${shortTitle}\n\n${url}\n\n#FMHeart`,
   });
 }
@@ -164,6 +190,7 @@ type ArticleFacebookFields = {
   category?: unknown;
   breaking?: unknown;
   status?: unknown;
+  coverImage?: unknown;
   facebookPostId?: unknown;
 };
 
@@ -201,6 +228,7 @@ export async function postFirestoreArticleToFacebook(options: {
     type: options.data.type === "gossip" ? "gossip" : "news",
     category: String(options.data.category || ""),
     breaking: Boolean(options.data.breaking),
+    coverImage: String(options.data.coverImage || ""),
   });
 
   if (!result.ok) {

@@ -394,13 +394,15 @@ export default function AdminArticlesPage() {
                       Publish
                     </button>
                   ) : null}
-                  {a.status === "published" && !a.facebookPostId ? (
+                  {a.status === "published" ? (
                     <button
                       type="button"
                       className="font-bold text-fh-red"
                       onClick={async () => {
                         try {
-                          const fb = await postArticleToFacebook(a.id);
+                          const fb = await postArticleToFacebook(a.id, {
+                            force: Boolean(a.facebookPostId),
+                          });
                           setMessage(
                             fb.skipped
                               ? "Facebook: already posted"
@@ -416,7 +418,7 @@ export default function AdminArticlesPage() {
                         }
                       }}
                     >
-                      Post FB
+                      {a.facebookPostId ? "Repost FB" : "Post FB"}
                     </button>
                   ) : null}
                   <div className="flex gap-2">

@@ -127,6 +127,7 @@ export async function POST(request: Request) {
       type: data.type === "gossip" ? "gossip" : "news",
       category: String(data.category || ""),
       breaking: Boolean(data.breaking),
+      coverImage: String(data.coverImage || ""),
     });
 
     if (!result.ok) {
