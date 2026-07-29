@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import {
   deleteArticle,
   listArticles,
+  postArticleToFacebook,
   saveArticle,
   setArticleStatus,
   slugify,
@@ -32,6 +33,7 @@ export default function AdminArticlesPage() {
   const [busy, setBusy] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [filter, setFilter] = useState<"all" | "draft" | "published">("all");
+  const [postToFacebook, setPostToFacebook] = useState(true);
 
   async function refresh() {
     const items = await listArticles({ status: "all", limit: 80 });
@@ -46,6 +48,19 @@ export default function AdminArticlesPage() {
   useEffect(() => {
     void refresh();
   }, []);
+
+  async function maybePostFacebook(articleId: string, status: string) {
+    if (!postToFacebook || status !== "published") return null;
+    try {
+      const fb = await postArticleToFacebook(articleId);
+      if (fb.skipped) return "Facebook: already posted";
+      return fb.postUrl
+        ? `Facebook posted ✓ ${fb.postUrl}`
+        : "Facebook posted ✓";
+    } catch (err) {
+      return `Facebook failed: ${err instanceof Error ? err.message : "error"}`;
+    }
+  }
 
   async function handleSave(e: FormEvent) {
     e.preventDefault();
@@ -68,11 +83,17 @@ export default function AdminArticlesPage() {
       ) {
         payload.slug = slugify(payload.title);
       }
-      await saveArticle(payload, editingId);
-      setMessage(editingId ? "Updated ✓" : "Published/Saved ✓");
+      const saved = await saveArticle(payload, editingId);
+      const fbMsg = await maybePostFacebook(saved.id, saved.status);
+      setMessage(
+        [editingId ? "Updated ✓" : "Published/Saved ✓", fbMsg]
+          .filter(Boolean)
+          .join(" · "),
+      );
       setForm(emptyForm);
       setTagInput("");
       setEditingId(undefined);
+      setPostToFacebook(true);
       await refresh();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Save failed");
@@ -83,6 +104,7 @@ export default function AdminArticlesPage() {
 
   function startEdit(article: CmsArticle) {
     setEditingId(article.id);
+    setPostToFacebook(!article.facebookPostId);
     setForm({
       type: article.type,
       title: article.title,
@@ -247,6 +269,21 @@ export default function AdminArticlesPage() {
             className="w-full border border-neutral-300 px-3 py-2 text-sm"
           />
 
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={postToFacebook}
+              onChange={(e) => setPostToFacebook(e.target.checked)}
+              className="size-4 accent-fh-red"
+            />
+            <span>
+              Post to Facebook when published
+              <span className="block text-xs text-fh-muted">
+                Needs FACEBOOK_PAGE_ID + PAGE access token in env
+              </span>
+            </span>
+          </label>
+
           <div className="flex gap-2">
             <button
               type="submit"
@@ -263,6 +300,7 @@ export default function AdminArticlesPage() {
                   setEditingId(undefined);
                   setForm(emptyForm);
                   setTagInput("");
+                  setPostToFacebook(true);
                 }}
               >
                 Cancel
@@ -291,6 +329,7 @@ export default function AdminArticlesPage() {
                     {a.type} · {a.status} · {a.category}
                     {a.ingestedBy === "newsbot" ? " · bot" : ""}
                     {a.source ? ` · ${a.source}` : ""} · {a.views || 0} views
+                    {a.facebookPostId ? " · FB ✓" : ""}
                   </p>
                   {a.sourceUrl ? (
                     <a
@@ -302,6 +341,21 @@ export default function AdminArticlesPage() {
                       Source link
                     </a>
                   ) : null}
+                  {a.facebookPostUrl ? (
+                    <a
+                      href={a.facebookPostUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-2 text-[11px] text-fh-red hover:underline"
+                    >
+                      Facebook post
+                    </a>
+                  ) : null}
+                  {a.facebookPostError ? (
+                    <p className="text-[11px] text-red-600">
+                      FB: {a.facebookPostError}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1 text-xs">
                   {a.status === "draft" ? (
@@ -311,16 +365,58 @@ export default function AdminArticlesPage() {
                       onClick={async () => {
                         try {
                           await setArticleStatus(a.id, "published");
-                          setMessage("Published ✓");
+                          let fbMsg: string | null = null;
+                          if (postToFacebook) {
+                            try {
+                              const fb = await postArticleToFacebook(a.id);
+                              fbMsg = fb.skipped
+                                ? "Facebook: already posted"
+                                : "Facebook posted ✓";
+                            } catch (err) {
+                              fbMsg = `Facebook failed: ${
+                                err instanceof Error ? err.message : "error"
+                              }`;
+                            }
+                          }
+                          setMessage(
+                            ["Published ✓", fbMsg].filter(Boolean).join(" · "),
+                          );
                           await refresh();
                         } catch (err) {
                           setMessage(
-                            err instanceof Error ? err.message : "Publish failed",
+                            err instanceof Error
+                              ? err.message
+                              : "Publish failed",
                           );
                         }
                       }}
                     >
                       Publish
+                    </button>
+                  ) : null}
+                  {a.status === "published" && !a.facebookPostId ? (
+                    <button
+                      type="button"
+                      className="font-bold text-fh-red"
+                      onClick={async () => {
+                        try {
+                          const fb = await postArticleToFacebook(a.id);
+                          setMessage(
+                            fb.skipped
+                              ? "Facebook: already posted"
+                              : "Facebook posted ✓",
+                          );
+                          await refresh();
+                        } catch (err) {
+                          setMessage(
+                            err instanceof Error
+                              ? err.message
+                              : "Facebook post failed",
+                          );
+                        }
+                      }}
+                    >
+                      Post FB
                     </button>
                   ) : null}
                   <div className="flex gap-2">
@@ -341,7 +437,9 @@ export default function AdminArticlesPage() {
                           await refresh();
                         } catch (err) {
                           setMessage(
-                            err instanceof Error ? err.message : "Delete failed",
+                            err instanceof Error
+                              ? err.message
+                              : "Delete failed",
                           );
                         }
                       }}

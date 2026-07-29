@@ -26,6 +26,11 @@ export interface CmsArticle {
   sourceUrl?: string;
   sourceHash?: string;
   ingestedBy?: "manual" | "newsbot";
+  /** Facebook Page auto-post */
+  facebookPostId?: string | null;
+  facebookPostUrl?: string | null;
+  facebookPostedAt?: string | null;
+  facebookPostError?: string | null;
 }
 
 export interface CmsArticleInput {

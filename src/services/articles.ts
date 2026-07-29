@@ -462,6 +462,59 @@ export async function deleteArticle(id: string): Promise<void> {
   }
 }
 
+/** Post a published article to the Facebook Page (server Graph API). */
+export async function postArticleToFacebook(
+  articleId: string,
+  options?: { force?: boolean },
+): Promise<{
+  ok: boolean;
+  skipped?: boolean;
+  postId?: string;
+  postUrl?: string;
+  message?: string;
+  error?: string;
+}> {
+  const { getFirebaseAuth } = await import("@/lib/firebase/client");
+  const auth = getFirebaseAuth();
+  const token = await auth?.currentUser?.getIdToken();
+  if (!token) {
+    throw new Error("Admin login අවශ්‍යයි (Facebook post).");
+  }
+
+  const res = await fetch("/api/admin/facebook/post", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      articleId,
+      force: Boolean(options?.force),
+    }),
+  });
+
+  const body = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    skipped?: boolean;
+    postId?: string;
+    postUrl?: string;
+    message?: string;
+    error?: string;
+  };
+
+  if (!res.ok) {
+    throw new Error(body.error || `Facebook post failed (${res.status})`);
+  }
+
+  return {
+    ok: true,
+    skipped: body.skipped,
+    postId: body.postId,
+    postUrl: body.postUrl,
+    message: body.message,
+  };
+}
+
 export function cmsToCard(article: CmsArticle) {
   const path =
     article.type === "gossip"
