@@ -45,50 +45,29 @@ export function articlePublicUrl(input: {
 
 export function buildFacebookMessage(input: FacebookPostInput): string {
   const url = articlePublicUrl(input);
-  const excerpt = (input.excerpt || "").trim();
+  const title = input.title.trim().slice(0, 180);
+  const excerpt = (input.excerpt || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 140);
+
   const lines: string[] = [];
-
-  if (input.breaking) {
-    lines.push("🚨 BREAKING NEWS", "");
+  if (input.breaking) lines.push("🚨 BREAKING NEWS", "");
+  lines.push(title);
+  if (excerpt && excerpt !== title) {
+    lines.push("", excerpt);
   }
-
-  lines.push(input.title.trim());
-
-  if (excerpt) {
-    lines.push("", excerpt.slice(0, 280));
-  }
-
-  lines.push("", "👉 වැඩි විස්තර:", url);
-
-  const tags = ["#FMHeart", "#SriLanka"];
-  if (input.category?.includes("ක්‍රීඩා") || /sport/i.test(input.category || "")) {
-    tags.push("#Sports");
-  }
-  lines.push("", tags.join(" "));
-
+  lines.push("", "👉 වැඩි විස්තර:", url, "", "#FMHeart #SriLanka");
   return lines.join("\n");
 }
 
-/** Publish a link post to the connected Facebook Page. */
-export async function postArticleToFacebookPage(
-  input: FacebookPostInput,
+async function graphFeedPost(
+  pageId: string,
+  token: string,
+  fields: Record<string, string>,
 ): Promise<FacebookPostResult | FacebookPostError> {
-  const pageId = process.env.FACEBOOK_PAGE_ID?.trim();
-  const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN?.trim();
-
-  if (!pageId || !token) {
-    return {
-      ok: false,
-      error: "Facebook env vars missing (FACEBOOK_PAGE_ID / FACEBOOK_PAGE_ACCESS_TOKEN)",
-    };
-  }
-
-  const message = buildFacebookMessage(input);
-  const link = articlePublicUrl(input);
-
   const body = new URLSearchParams({
-    message,
-    link,
+    ...fields,
     access_token: token,
   });
 
@@ -125,6 +104,41 @@ export async function postArticleToFacebookPage(
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+/** Publish a Page post (message + URL). Avoids Graph `link` scrape which can fail. */
+export async function postArticleToFacebookPage(
+  input: FacebookPostInput,
+): Promise<FacebookPostResult | FacebookPostError> {
+  const pageId = process.env.FACEBOOK_PAGE_ID?.trim();
+  const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN?.trim();
+
+  if (!pageId || !token) {
+    return {
+      ok: false,
+      error: "Facebook env vars missing (FACEBOOK_PAGE_ID / FACEBOOK_PAGE_ACCESS_TOKEN)",
+    };
+  }
+
+  // Do NOT send Graph `link=` — FB scrapes the page and often returns
+  // "Please reduce the amount of data you're asking for".
+  const full = await graphFeedPost(pageId, token, {
+    message: buildFacebookMessage(input),
+  });
+  if (full.ok) return full;
+
+  const reduce =
+    /reduce the amount of data|too much data|request entity too large/i.test(
+      full.error,
+    );
+  if (!reduce) return full;
+
+  // Minimal retry: title + URL only
+  const url = articlePublicUrl(input);
+  const shortTitle = input.title.trim().slice(0, 120);
+  return graphFeedPost(pageId, token, {
+    message: `${shortTitle}\n\n${url}\n\n#FMHeart`,
+  });
 }
 
 export function isNewsbotFacebookAutoPostEnabled(): boolean {
