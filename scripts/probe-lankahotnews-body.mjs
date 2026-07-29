@@ -1,0 +1,12 @@
+const UA = "FMHeartNewsBot/1.0 (+https://fmheart.lk)";
+const link = "https://www.lankahotnews.net/2026/07/dew-nuwara-asala-perahera.html";
+const r = await fetch(link, { headers: { "User-Agent": UA } });
+const html = await r.text();
+const postContent = html.match(/<div[^>]+class=["'][^"']*\bpost-content\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1];
+console.log("post-content len", postContent?.length);
+console.log("preview", postContent?.slice(0, 500).replace(/\s+/g, " "));
+const entry = html.match(/<div[^>]+class=["'][^"']*\bpost-body\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1];
+console.log("post-body len", entry?.length);
+console.log("entry-content", html.includes("entry-content"));
+const imgs = [...html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)].map((m) => m[1]).slice(0, 5);
+console.log("imgs", imgs);

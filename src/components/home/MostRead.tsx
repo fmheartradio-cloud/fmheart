@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { CoverImage } from "@/components/ui/CoverImage";
 import type { Article } from "@/types";
 
 export function MostRead({ articles }: { articles: Article[] }) {
@@ -21,13 +21,12 @@ export function MostRead({ articles }: { articles: Article[] }) {
                 {String(i + 1).padStart(2, "0")}
               </span>
               <div className="relative h-14 w-14 shrink-0 overflow-hidden bg-neutral-200">
-                <Image
+                <CoverImage
                   src={article.image}
-                  alt=""
                   fill
-                  unoptimized
                   className="object-cover"
                   sizes="56px"
+                  showWatermark={false}
                 />
               </div>
               <div className="min-w-0">

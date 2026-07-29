@@ -41,8 +41,7 @@ function loadServiceAccount():
   return { projectId, clientEmail, privateKey };
 }
 
-export function getAdminDb(): Firestore | null {
-  if (db) return db;
+export function getAdminApp(): App | null {
   const sa = loadServiceAccount();
   if (!sa) return null;
 
@@ -58,8 +57,14 @@ export function getAdminDb(): Firestore | null {
   } else {
     app = getApps()[0];
   }
+  return app;
+}
 
-  db = getFirestore(app, FIRESTORE_DB_ID);
+export function getAdminDb(): Firestore | null {
+  if (db) return db;
+  const adminApp = getAdminApp();
+  if (!adminApp) return null;
+  db = getFirestore(adminApp, FIRESTORE_DB_ID);
   return db;
 }
 

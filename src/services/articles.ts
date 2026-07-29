@@ -1,5 +1,6 @@
 import type { CmsArticle, CmsArticleInput } from "@/types/cms";
 import { gossipNews, latestNews } from "@/data/mock";
+import { formatSriLankaDateTime } from "@/lib/datetime";
 import { isFirebaseConfigured } from "@/lib/firebase/client";
 import { finalizeCoverUrl, upgradeImageUrl } from "@/lib/image-url";
 import { toPlainExcerpt, toPlainText } from "@/lib/plain-text";
@@ -137,22 +138,25 @@ function mockToCms(): CmsArticle[] {
   return [...news, ...gossip];
 }
 
-function sortByUpdated(items: CmsArticle[]): CmsArticle[] {
+function sortByPublished(items: CmsArticle[]): CmsArticle[] {
   return [...items].sort((a, b) => {
-    const ta = Date.parse(a.updatedAt || a.publishedAt || a.createdAt || "") || 0;
-    const tb = Date.parse(b.updatedAt || b.publishedAt || b.createdAt || "") || 0;
+    const ta =
+      Date.parse(a.publishedAt || a.createdAt || a.updatedAt || "") || 0;
+    const tb =
+      Date.parse(b.publishedAt || b.createdAt || b.updatedAt || "") || 0;
     return tb - ta;
   });
 }
 
-/** Hide non-Sinhala news on public site; admin (status=all) and gossip unchanged. */
+/** Hide non-Sinhala news and cover-less / junk-cover news on the public site. */
 function filterPublicNews(items: CmsArticle[], status: string): CmsArticle[] {
   if (status === "all") return items;
-  return items.filter(
-    (a) =>
-      a.type !== "news" ||
-      hasSinhalaNewsText(a.title, a.excerpt),
-  );
+  return items.filter((a) => {
+    if (a.type !== "news") return true;
+    if (!hasSinhalaNewsText(a.title, a.excerpt)) return false;
+    const cover = finalizeCoverUrl(a.coverImage || "");
+    return Boolean(cover);
+  });
 }
 
 async function tryFirestore() {
@@ -205,7 +209,7 @@ export async function listArticles(options?: {
       );
       if (type) items = items.filter((a) => a.type === type);
       items = filterPublicNews(items, status);
-      return sortByUpdated(items).slice(0, limitCount);
+      return sortByPublished(items).slice(0, limitCount);
     }
   } catch (err) {
     console.warn("[articles] Firestore read failed:", err);
@@ -218,7 +222,7 @@ export async function listArticles(options?: {
   if (type) items = items.filter((a) => a.type === type);
   if (status !== "all") items = items.filter((a) => a.status === status);
   items = filterPublicNews(items, status);
-  return items.slice(0, limitCount);
+  return sortByPublished(items).slice(0, limitCount);
 }
 
 export async function getArticleBySlug(rawSlug: string): Promise<CmsArticle | null> {
@@ -394,9 +398,65 @@ export async function setArticleStatus(
 export async function deleteArticle(id: string): Promise<void> {
   const db = await tryFirestore();
   if (!db) throw new Error("Firebase configured නැහැ.");
-  const { deleteDoc, doc } = await import("firebase/firestore");
+
+  // Prefer admin API so newsbot_blocked is written with Admin SDK
+  // (client rules may not be deployed yet).
   try {
-    await withTimeout(deleteDoc(doc(db, "articles", id)), 12000, "Firestore delete");
+    const { getFirebaseAuth } = await import("@/lib/firebase/client");
+    const auth = getFirebaseAuth();
+    const token = await auth?.currentUser?.getIdToken();
+    if (token) {
+      const res = await fetch(`/api/admin/articles/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) return;
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (res.status !== 503) {
+        throw new Error(body.error || `Delete failed (${res.status})`);
+      }
+    }
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      !/Admin SDK not configured|Failed to fetch|503/i.test(err.message)
+    ) {
+      throw err;
+    }
+  }
+
+  const { deleteDoc, doc, getDoc, setDoc } = await import("firebase/firestore");
+  try {
+    const ref = doc(db, "articles", id);
+    const snap = await withTimeout(getDoc(ref), 12000, "Firestore get");
+    if (snap.exists()) {
+      const data = snap.data() as CmsArticle;
+      const sourceUrl = String(data.sourceUrl || "").trim();
+      if (sourceUrl) {
+        const { sourceUrlKeyAsync } = await import("@/lib/newsbot/blocklist");
+        const key = await sourceUrlKeyAsync(sourceUrl);
+        try {
+          await withTimeout(
+            setDoc(
+              doc(db, "newsbot_blocked", key),
+              {
+                sourceUrl,
+                sourceHash: data.sourceHash || null,
+                title: data.title || "",
+                reason: "admin_delete",
+                blockedAt: new Date().toISOString(),
+              },
+              { merge: true },
+            ),
+            12000,
+            "Firestore blocklist",
+          );
+        } catch {
+          /* rules may block until published — article delete still proceeds */
+        }
+      }
+    }
+    await withTimeout(deleteDoc(ref), 12000, "Firestore delete");
   } catch (err) {
     throw new Error(mapFirebaseError(err));
   }
@@ -414,7 +474,7 @@ export function cmsToCard(article: CmsArticle) {
     category: article.category,
     image: article.coverImage || "/logo/fmheart-cover.png",
     publishedAt: article.publishedAt
-      ? new Date(article.publishedAt).toLocaleString("si-LK")
+      ? formatSriLankaDateTime(article.publishedAt)
       : article.status,
     slug: article.slug,
     href: path,

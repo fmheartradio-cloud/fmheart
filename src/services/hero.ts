@@ -1,4 +1,5 @@
 import { heroSlides as mockSlides } from "@/data/mock";
+import { formatSriLankaDateTime } from "@/lib/datetime";
 import { isFirebaseConfigured } from "@/lib/firebase/client";
 import { finalizeCoverUrl, upgradeImageUrl } from "@/lib/image-url";
 import { toHeroExcerpt } from "@/lib/plain-text";
@@ -65,7 +66,7 @@ export function cmsToHeroSlide(article: CmsArticle): Article {
     image:
       finalizeCoverUrl(article.coverImage || "") || "/logo/fmheart-cover.png",
     publishedAt: article.publishedAt
-      ? new Date(article.publishedAt).toLocaleString("si-LK")
+      ? formatSriLankaDateTime(article.publishedAt)
       : "දැන්",
     slug: article.slug,
   };

@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArticleViewTracker } from "@/components/analytics/ArticleViewTracker";
 import { AdSenseUnit } from "@/components/ads/AdSenseUnit";
+import { MostRead } from "@/components/home/MostRead";
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
 import { ArticleJsonLd } from "@/components/seo/JsonLd";
+import { CoverImage } from "@/components/ui/CoverImage";
+import { ShareButtons } from "@/components/ui/ShareButtons";
 import { adSlot } from "@/lib/ads";
+import { formatSriLankaDateTime } from "@/lib/datetime";
 import { SITE } from "@/lib/site";
 import { getArticleBySlug, listArticles } from "@/services/articles";
 
@@ -56,11 +59,25 @@ export default async function NewsArticlePage({ params }: Props) {
     // ignore
   }
 
-  const related = (await listArticles({ type: "news", limit: 4 })).filter(
+  const latest = (await listArticles({ type: "news", limit: 12 })).filter(
     (a) => a.slug !== article.slug,
   );
+  const mostReadCards = latest.slice(0, 5).map((a) => ({
+    id: a.id,
+    title: a.title,
+    category: a.category,
+    image: a.coverImage || "/logo/fmheart-cover.png",
+    publishedAt: a.publishedAt
+      ? formatSriLankaDateTime(a.publishedAt)
+      : "",
+    slug: a.slug,
+  }));
+  const sidebarRelated = latest.slice(5, 12);
 
   const url = `${SITE.url}/news/${article.slug}`;
+  const publishedIso = article.publishedAt || article.createdAt;
+  const datestamp = publishedIso ? formatSriLankaDateTime(publishedIso) : "";
+  const coverSrc = article.coverImage || "/logo/fmheart-cover.png";
 
   return (
     <div className="min-h-screen pb-16 md:pb-0">
@@ -68,17 +85,17 @@ export default async function NewsArticlePage({ params }: Props) {
         title={article.title}
         description={article.excerpt}
         image={article.coverImage}
-        publishedAt={article.publishedAt || article.createdAt}
+        publishedAt={publishedIso}
         author={article.author}
         url={url}
       />
       <TopBar />
       <Header />
       <ArticleViewTracker articleId={article.id} />
-      <main className="mx-auto max-w-7xl px-3 py-8 md:px-4">
+      <main className="mx-auto max-w-7xl px-3 py-6 md:px-4 md:py-8">
         <div className="grid gap-8 lg:grid-cols-[1fr_300px]">
-          <article>
-            <nav className="mb-4 text-xs text-fh-muted">
+          <article className="min-w-0">
+            <nav className="mb-3 text-xs text-fh-muted">
               <Link href="/" className="hover:text-fh-red">
                 මුල් පිටුව
               </Link>
@@ -88,39 +105,42 @@ export default async function NewsArticlePage({ params }: Props) {
               </Link>
             </nav>
 
-            <h1 className="font-news-headline mt-3 text-3xl leading-snug md:text-4xl">
-              {article.title}
-            </h1>
-            <div className="mt-3 flex flex-wrap gap-3 text-xs text-fh-muted">
-              <span>{article.author}</span>
-              <span>·</span>
-              <span>{article.readingTimeMin} min read</span>
-              {article.publishedAt && (
-                <>
-                  <span>·</span>
-                  <time dateTime={article.publishedAt}>
-                    {new Date(article.publishedAt).toLocaleDateString("si-LK")}
-                  </time>
-                </>
-              )}
-            </div>
-
-            <div className="relative mt-6 aspect-[16/9] overflow-hidden bg-neutral-200">
-              <Image
-                src={article.coverImage || "/logo/fmheart-cover.png"}
+            {/* Cover first — natural width (no forced 16:9 crop) */}
+            <div className="relative w-full overflow-hidden bg-neutral-100">
+              <CoverImage
+                src={coverSrc}
                 alt=""
-                fill
+                width={1200}
+                height={675}
                 priority
-                unoptimized
-                className="object-cover"
                 sizes="(max-width: 1024px) 100vw, 70vw"
+                className="h-auto w-full object-contain"
               />
             </div>
+
+            <h1 className="font-news-headline mt-4 text-2xl leading-snug text-fh-ink md:mt-5 md:text-4xl">
+              {article.title}
+            </h1>
+
+            {datestamp ? (
+              <time
+                dateTime={publishedIso}
+                className="mt-2 block font-feature text-sm text-fh-muted md:text-[15px]"
+              >
+                {datestamp}
+              </time>
+            ) : null}
+            <p className="mt-1 text-xs text-fh-muted">
+              {article.author}
+              {article.readingTimeMin
+                ? ` · ${article.readingTimeMin} min read`
+                : ""}
+            </p>
 
             <AdSenseUnit
               slot={adSlot("header")}
               label="After Featured Image"
-              className="mt-6 min-h-[90px]"
+              className="mt-5 min-h-[90px]"
             />
 
             <div className="prose-article mt-6 space-y-4 text-justify font-article text-lg leading-8 text-fh-ink whitespace-pre-line">
@@ -133,59 +153,49 @@ export default async function NewsArticlePage({ params }: Props) {
               className="my-8 min-h-[90px]"
             />
 
-            <div className="flex flex-wrap gap-2 border-t border-neutral-200 pt-6">
-              <span className="text-sm font-semibold">Share:</span>
-              <a
-                className="text-sm text-fh-red hover:underline"
-                href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Facebook
-              </a>
-              <a
-                className="text-sm text-fh-red hover:underline"
-                href={`https://wa.me/?text=${encodeURIComponent(article.title + " " + url)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                WhatsApp
-              </a>
-            </div>
-
-            {related.length > 0 && (
-              <section className="mt-10">
-                <h2 className="border-b-2 border-fh-red pb-2 font-heading text-xl font-extrabold">
-                  අදාළ පුවත්
-                </h2>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  {related.slice(0, 4).map((item) => (
-                    <Link
-                      key={item.id}
-                      href={`/news/${encodeURIComponent(item.slug)}`}
-                      className="flex gap-3 hover:opacity-90"
-                    >
-                      <div className="relative h-16 w-20 shrink-0 overflow-hidden bg-neutral-200">
-                        <Image
-                          src={item.coverImage || "/logo/fmheart-cover.png"}
-                          alt=""
-                          fill
-                          unoptimized
-                          className="object-cover"
-                          sizes="80px"
-                        />
-                      </div>
-                      <h3 className="font-news-headline text-sm leading-snug">
-                        {item.title}
-                      </h3>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            )}
+            <ShareButtons url={url} title={article.title} />
           </article>
 
-          <aside className="space-y-5">
+          <aside className="space-y-5 lg:sticky lg:top-4 lg:self-start">
+            {mostReadCards.length > 0 ? (
+              <MostRead articles={mostReadCards} />
+            ) : null}
+
+            {sidebarRelated.length > 0 ? (
+              <section className="border border-neutral-200 bg-white">
+                <div className="bg-fh-red px-4 py-2.5">
+                  <h2 className="font-heading text-sm font-bold tracking-wide text-white">
+                    අදාළ පුවත්
+                  </h2>
+                </div>
+                <div className="max-h-[420px] overflow-y-auto">
+                  <ul className="divide-y divide-neutral-100">
+                    {sidebarRelated.map((item) => (
+                      <li key={item.id}>
+                        <Link
+                          href={`/news/${encodeURIComponent(item.slug)}`}
+                          className="flex gap-3 p-3 transition hover:bg-fh-surface"
+                        >
+                          <div className="relative h-14 w-[4.5rem] shrink-0 overflow-hidden bg-neutral-200">
+                            <CoverImage
+                              src={item.coverImage || "/logo/fmheart-cover.png"}
+                              fill
+                              className="object-cover"
+                              sizes="72px"
+                              showWatermark={false}
+                            />
+                          </div>
+                          <h3 className="font-news-headline text-sm leading-snug line-clamp-3">
+                            {item.title}
+                          </h3>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </section>
+            ) : null}
+
             <AdSenseUnit
               slot={adSlot("sidebar")}
               label="Sidebar 300×250"

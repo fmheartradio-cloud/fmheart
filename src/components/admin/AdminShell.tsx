@@ -8,6 +8,7 @@ import { useAdminAuth } from "@/context/AdminAuthProvider";
 const NAV: { href: string; label: string; exact?: boolean }[] = [
   { href: "/admin", label: "Overview", exact: true },
   { href: "/admin/articles", label: "Articles" },
+  { href: "/admin/videos", label: "Videos" },
   { href: "/admin/breaking", label: "Breaking" },
   { href: "/admin/hero", label: "Hero" },
 ];

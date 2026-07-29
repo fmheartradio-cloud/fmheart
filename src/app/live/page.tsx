@@ -17,6 +17,18 @@ export const metadata: Metadata = {
   openGraph: {
     title: "FM Heart Live Radio",
     description: SITE.taglineEn,
+    images: [
+      {
+        url: "/logo/website-Feature.png",
+        width: 516,
+        height: 276,
+        alt: "FM Heart",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/logo/website-Feature.png"],
   },
 };
 

@@ -43,7 +43,7 @@ const yaldevi = Yaldevi({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
   title: {
-    default: `${SITE.name} — ශ්‍රී ලංකාවේ තරුණ හදවතේ Digital Media Platform`,
+    default: SITE.brandTitle,
     template: `%s | ${SITE.name}`,
   },
   description: SITE.description,
@@ -70,26 +70,27 @@ export const metadata: Metadata = {
     locale: "si_LK",
     url: SITE.url,
     siteName: SITE.name,
-    title: `${SITE.name} — Digital Media Platform`,
+    title: SITE.brandTitle,
     description: SITE.description,
     images: [
       {
-        url: "/logo/fmheart-cover.png",
-        width: 1200,
-        height: 1200,
+        url: "/logo/website-Feature.png",
+        width: 516,
+        height: 276,
         alt: "FM Heart",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: SITE.name,
-    description: SITE.taglineEn,
-    images: ["/logo/fmheart-cover.png"],
+    title: SITE.brandTitle,
+    description: SITE.description,
+    images: ["/logo/website-Feature.png"],
   },
   icons: {
-    icon: [{ url: "/logo/fmheart-icon-official.png", type: "image/png" }],
-    apple: "/logo/fmheart-badge.png",
+    icon: [{ url: "/logo/fm-icon.png", type: "image/png" }],
+    shortcut: "/logo/fm-icon.png",
+    apple: "/logo/fm-icon.png",
   },
   robots: {
     index: true,

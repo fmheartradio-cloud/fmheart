@@ -31,6 +31,11 @@ service cloud.firestore {
         );
     }
 
+    // Admin-deleted / uncovered source URLs — newsbot must never re-ingest these.
+    match /newsbot_blocked/{blockId} {
+      allow read, write: if isAdmin();
+    }
+
     match /settings/{docId} {
       allow read: if true;
       allow write: if isAdmin();

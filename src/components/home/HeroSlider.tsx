@@ -15,6 +15,11 @@ export function HeroSlider({ slides: initialSlides }: HeroSliderProps) {
     initialSlides && initialSlides.length > 0 ? initialSlides : mockSlides;
   const [index, setIndex] = useState(0);
   const slide = slides[index] ?? slides[0];
+  const slideKey = slides.map((s) => s.id).join(",");
+
+  useEffect(() => {
+    setIndex(0);
+  }, [slideKey]);
 
   useEffect(() => {
     if (slides.length < 2) return;
@@ -22,7 +27,7 @@ export function HeroSlider({ slides: initialSlides }: HeroSliderProps) {
       setIndex((i) => (i + 1) % slides.length);
     }, 6500);
     return () => clearInterval(id);
-  }, [slides.length]);
+  }, [slides.length, slideKey]);
 
   if (!slide) return null;
 
@@ -45,6 +50,20 @@ export function HeroSlider({ slides: initialSlides }: HeroSliderProps) {
             sizes="(max-width: 1024px) calc(100vw - 1.5rem), 70vw"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/20" />
+          <div
+            className="pointer-events-none absolute top-3 left-3 z-[1] w-[20%] max-w-[110px] md:top-4 md:left-4 md:w-[15%] md:max-w-[140px] lg:max-w-[155px]"
+            aria-hidden
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo/24-water-mark.png"
+              alt=""
+              width={3834}
+              height={1309}
+              className="block h-auto w-full object-contain opacity-95"
+              draggable={false}
+            />
+          </div>
         </div>
       ))}
 

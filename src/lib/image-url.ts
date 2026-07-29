@@ -8,6 +8,8 @@ const ADA_DERANA_SMALL_RE =
   /(?:_S|_M|_t|-\d{2,3})\.(jpe?g|png|webp|gif|avif)(?:[?#]|$)/i;
 const THUMB_PATH_RE =
   /(?:^|[/_-])(thumb(?:nail)?s?|small|mini|icon|logo|avatar|sprite|brand)(?:[/_-]|\.)/i;
+const VIDEO_THUMB_RE =
+  /(?:ytimg|youtube|youtubei|vimeocdn|dailymotion|jwplayer|maxresdefault|hqdefault|mqdefault|sddefault|video[-_/]?thumb|thumbnail[-_/]?video|poster[-_/]?frame|play[-_/]?overlay|embed[-_/]?thumb)/i;
 
 const MIN_COVER_WIDTH = 600;
 
@@ -110,16 +112,44 @@ export function needsHigherQualityCover(url: string): boolean {
 /** Skip icons, logos, and tracking pixels as article covers. */
 export function isLikelyJunkCoverUrl(url: string): boolean {
   if (!url) return true;
+  try {
+    const u = new URL(url);
+    const path = u.pathname;
+    const trimmedPath = path.replace(/\/+$/, "");
+    // Empty Ada S3 bucket URL (RSS often emits this when no thumb exists).
+    if (/\/adaderanasinhala$/i.test(trimmedPath)) return true;
+    // Directory / incomplete WP upload path (no filename) — cannot load as <img>.
+    if (/\/wp-content\/uploads\/\d{4}\/\d{2}\/?$/i.test(path)) return true;
+    const last = trimmedPath.split("/").filter(Boolean).pop() || "";
+    if (
+      /\/wp-content\/uploads\//i.test(path) &&
+      last &&
+      !/\.(jpe?g|png|webp|gif|avif)$/i.test(last)
+    ) {
+      return true;
+    }
+  } catch {
+    if (/adaderanasinhala\/?\s*$/i.test(url)) return true;
+    if (/\/wp-content\/uploads\/\d{4}\/\d{2}\/?$/i.test(url)) return true;
+  }
+  if (isLikelyVideoThumbnailUrl(url)) return true;
   return /logo|icon|avatar|pixel|spacer|1x1|tracking|badge|sprite|advertising\.gif|brand\.jpg|gel\/brand|pix\.png|lanka-e-news-log|new-year-\d{4}/i.test(
     url,
   );
 }
 
+/** Video player thumbnails should not be used as article covers. */
+export function isLikelyVideoThumbnailUrl(url: string): boolean {
+  if (!url) return false;
+  return VIDEO_THUMB_RE.test(url);
+}
+
 function upgradeAdaDeranaPath(path: string): string {
+  // Ada S3 often has _S / _M / unsuffixed full files, but NOT a matching _L.
+  // Blindly rewriting _S/_M → _L produces broken 404 covers — prefer _M instead.
   return path
-    .replace(/_S\.(jpe?g|png|webp|gif|avif)$/i, "_L.$1")
-    .replace(/_M\.(jpe?g|png|webp|gif|avif)$/i, "_L.$1")
-    .replace(/_t\.(jpe?g|png|webp|gif|avif)$/i, "_L.$1")
+    .replace(/_S\.(jpe?g|png|webp|gif|avif)$/i, "_M.$1")
+    .replace(/_t\.(jpe?g|png|webp|gif|avif)$/i, "_M.$1")
     .replace(/-150\.(jpe?g|png|webp|gif|avif)$/i, "-350.$1")
     .replace(
       /-(\d{2,3})\.(jpe?g|png|webp|gif|avif)$/i,
@@ -143,7 +173,10 @@ function upgradeBloggerPath(path: string): string {
 
 function upgradeGenericPath(path: string, host: string): string {
   let next = path.replace(WP_SIZE_SUFFIX_RE, "");
-  next = upgradeAdaDeranaPath(next);
+  // Ada Derana size suffixes only — never rewrite Neth/WP filenames like Election-1.jpg → Election-350.jpg.
+  if (isAdaDeranaCdn(host, next)) {
+    next = upgradeAdaDeranaPath(next);
+  }
   next = next.replace(BBC_WS_RE, (_match, width) =>
     Number(width) >= 800 ? _match : "/ace/ws/976/",
   );
@@ -153,9 +186,6 @@ function upgradeGenericPath(path: string, host: string): string {
   next = next.replace(BBC_NEWS_RE, (_match, width) =>
     Number(width) >= 800 ? _match : "/news/1200/",
   );
-  if (isAdaDeranaCdn(host, next)) {
-    next = upgradeAdaDeranaPath(next);
-  }
   return next;
 }
 

@@ -58,18 +58,18 @@ export function Logo({ variant = "full", className = "" }: LogoProps) {
 
   if (variant === "compact") {
     return (
-      <Link href="/" className={`inline-flex items-center gap-2 ${className}`} aria-label="FM Heart">
+      <Link
+        href="/"
+        className={`inline-flex max-w-full items-center ${className}`}
+        aria-label="FM Heart"
+      >
         <Image
-          src="/logo/fmheart-icon-official.png"
-          alt=""
-          width={36}
-          height={36}
-          className="object-contain"
+          src="/logo/bottom-logo-image.png"
+          alt="FM Heart"
+          width={1439}
+          height={300}
+          className="h-9 w-auto max-w-[min(100%,220px)] object-contain object-left sm:h-10 sm:max-w-[260px]"
         />
-        <span className="font-heading text-lg font-extrabold tracking-wide">
-          <span className="text-white">FM</span>{" "}
-          <span className="text-fh-red">HEART</span>
-        </span>
       </Link>
     );
   }

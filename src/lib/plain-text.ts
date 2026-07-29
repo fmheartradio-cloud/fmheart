@@ -76,7 +76,8 @@ export function containsHtmlMarkup(text: string): boolean {
   );
 }
 
-/** Strip WordPress / Yoast "The post … appeared first on …" footers. */
+/** Strip WordPress / Yoast "The post … appeared first on …" footers
+ *  and Lanka Hot News share CTAs that leak into plain body text. */
 export function stripSyndicationFooter(text: string): string {
   if (!text) return "";
   return text
@@ -86,6 +87,19 @@ export function stripSyndicationFooter(text: string): string {
     )
     .replace(
       /\s*The\s+post\s+[\s\S]+?\s+appeared\s+first\s+on\s+[^\n.]+\.?\s*/gi,
+      " ",
+    )
+    // Lanka Hot News in-body share widget → plain text
+    .replace(
+      /\s*මේ\s*පුවත\s*තව\s*අයට\s*බලන්න[\s\S]*?WhatsApp\s*එකට\s*Share\s*කරන්න\.?\s*/giu,
+      " ",
+    )
+    .replace(
+      /\s*Facebook\s*එකට\s*Share\s*කරන්න\s*WhatsApp\s*එකට\s*Share\s*කරන්න\.?\s*/giu,
+      " ",
+    )
+    .replace(
+      /\s*මේ\s*පුවත\s*තව\s*අයට\s*බලන්න\s*/giu,
       " ",
     )
     .replace(/[ \t]{2,}/g, " ")

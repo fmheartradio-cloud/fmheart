@@ -1,0 +1,17 @@
+---
+description: After code changes, run npm run build and fix until green
+alwaysApply: true
+---
+
+# Autonomous build / fix loop
+
+When implementing features or fixing bugs in this Next.js project:
+
+1. After meaningful code changes, run `npm run build`.
+2. If the build fails, read the errors, fix them, and run `npm run build` again.
+3. Repeat until the production build succeeds with zero errors.
+4. Do not stop after each small fix to ask for confirmation.
+5. Only ask the user when a product, design, or credentials decision is required.
+6. Do **not** create a git commit unless the user explicitly asked to commit.
+
+This rule is about `npm run build` quality gates — not about re-running an already-completed plan file.

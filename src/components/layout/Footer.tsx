@@ -27,13 +27,13 @@ const brandLinks = [
 
 function FooterBrandStrip({ className = "" }: { className?: string }) {
   return (
-    <div className={`relative inline-flex max-w-full ${className}`}>
+    <div className={`relative mx-auto inline-flex w-full max-w-full ${className}`}>
       <Image
         src="/logo/footer-image.png"
         alt="FM Heart brands — The Heart Academy, Pulse Studio, and partners"
-        width={640}
-        height={48}
-        className="h-5 w-auto max-w-[min(100%,280px)] object-contain sm:h-6 sm:max-w-[340px] md:h-7 md:max-w-[400px] md:object-right"
+        width={2848}
+        height={208}
+        className="mx-auto h-5 w-auto max-w-[min(100%,280px)] object-contain object-center sm:h-6 sm:max-w-[340px] md:mx-0 md:h-7 md:max-w-[400px] md:object-right"
         sizes="(max-width: 640px) 280px, 400px"
         priority={false}
       />
@@ -45,7 +45,7 @@ function FooterBrandStrip({ className = "" }: { className?: string }) {
           className="block"
           aria-label="The Heart Academy"
         />
-        <Link href="/" className="block" aria-label="FM Heart" />
+        <Link href="/" className="block" aria-label="FM Heart 24x7" />
         <a
           href="https://wa.me/94771664184"
           target="_blank"
@@ -65,12 +65,13 @@ export function Footer() {
   return (
     <footer className="bg-fh-black text-neutral-300">
       <div className="border-b border-white/10">
-        <div className="mx-auto grid max-w-7xl gap-5 px-3 py-4 text-center sm:px-4 md:grid-cols-[1.2fr_1fr_1fr] md:gap-4 md:py-5 md:text-left">
-          <div className="flex flex-col items-center md:items-start">
+        <div className="mx-auto grid max-w-7xl gap-6 px-3 py-4 text-left sm:px-4 md:grid-cols-[1.2fr_1fr_1fr] md:gap-4 md:py-5">
+          <div className="flex flex-col items-start">
             <Logo variant="compact" />
             <p className="mt-4 max-w-sm font-feature text-sm leading-relaxed text-neutral-400">
-              ශ්‍රී ලංකාවේ තරුණ හදවතේ Digital Media Platform — Live Radio,
-              News, Gossip සහ Entertainment එකම තැනක.
+              තාරුණ්‍යය ම Update වෙන ලංකාවේ Platform එක!
+              <br />
+              Live Radio, News, Gossip සහ Entertainment එක ම තැනක.
             </p>
             <form
               className="mt-5 flex w-full max-w-md gap-2"
@@ -91,7 +92,7 @@ export function Footer() {
             </form>
           </div>
 
-          <div className="flex flex-col items-center md:items-start">
+          <div className="flex flex-col items-start">
             <h3 className="font-heading text-base font-bold text-white">
               Quick Links
             </h3>
@@ -106,7 +107,7 @@ export function Footer() {
             </ul>
           </div>
 
-          <div className="flex flex-col items-center md:items-start">
+          <div className="flex flex-col items-start">
             <h3 className="font-heading text-base font-bold text-white">
               Brands & Business
             </h3>
@@ -125,28 +126,43 @@ export function Footer() {
                 </li>
               ))}
             </ul>
-            <div className="mt-5 space-y-1 text-sm text-neutral-400">
+
+            <h3 className="mt-6 font-heading text-base font-bold text-white">
+              Contact Info
+            </h3>
+            <div className="mt-3 space-y-1 text-left text-sm text-neutral-400">
+              <p>{SITE.address}</p>
               {SITE.phones.map((p) => (
                 <p key={p}>{p}</p>
               ))}
               <p>
-                <a href={`https://wa.me/${SITE.whatsapp}`} className="hover:text-white">
+                <a
+                  href={`https://wa.me/${SITE.whatsapp}`}
+                  className="hover:text-white"
+                >
                   WhatsApp +94 77 21 75 779
                 </a>
               </p>
-              <p>{SITE.email}</p>
-              <p>{SITE.address}</p>
+              <p>
+                <a href={`mailto:${SITE.email}`} className="hover:text-white">
+                  {SITE.email}
+                </a>
+              </p>
             </div>
-            <div className="mt-4 flex justify-center md:mt-auto md:justify-end md:pt-4 md:self-end">
+
+            <div className="mt-4 hidden md:mt-auto md:flex md:justify-end md:pt-4 md:self-end">
               <FooterBrandStrip />
             </div>
           </div>
         </div>
+        <div className="flex justify-center px-3 pb-4 md:hidden">
+          <FooterBrandStrip />
+        </div>
       </div>
 
-      <div className="mx-auto flex max-w-7xl flex-col items-center justify-center gap-3 px-4 py-3 text-center text-xs text-neutral-500 md:flex-row md:justify-between md:text-left">
+      <div className="mx-auto flex max-w-7xl flex-col items-start justify-center gap-3 px-4 py-3 text-left text-xs text-neutral-500 md:flex-row md:items-center md:justify-between">
         <p>© {new Date().getFullYear()} FM Heart. All rights reserved.</p>
-        <div className="flex justify-center gap-4">
+        <div className="flex gap-4">
           <Link href="/privacy" className="hover:text-neutral-300">
             Privacy
           </Link>

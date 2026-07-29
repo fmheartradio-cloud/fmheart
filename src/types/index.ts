@@ -38,6 +38,8 @@ export interface VideoItem {
   views: string;
   publishedAt: string;
   slug: string;
+  /** YouTube / external video URL */
+  videoUrl?: string;
 }
 
 export interface RadioState {

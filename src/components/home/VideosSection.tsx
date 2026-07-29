@@ -3,6 +3,8 @@ import Link from "next/link";
 import type { VideoItem } from "@/types";
 
 export function VideosSection({ videos }: { videos: VideoItem[] }) {
+  if (!videos.length) return null;
+
   return (
     <section className="w-full max-w-full min-w-0 overflow-x-clip">
       <div className="mb-4 flex items-end justify-between gap-3 border-b-2 border-fh-red pb-2">
@@ -18,14 +20,17 @@ export function VideosSection({ videos }: { videos: VideoItem[] }) {
       </div>
 
       <div className="grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {videos.map((video) => (
-          <article key={video.id} className="group min-w-0">
-            <Link href={`/videos/${video.slug}`} className="block w-full max-w-full">
+        {videos.map((video) => {
+          const external = Boolean(video.videoUrl);
+          const href = video.videoUrl || `/videos`;
+          const inner = (
+            <>
               <div className="relative aspect-video overflow-hidden bg-neutral-900">
                 <Image
                   src={video.thumbnail}
                   alt=""
                   fill
+                  unoptimized
                   className="object-cover opacity-90 transition group-hover:scale-105 group-hover:opacity-100"
                   sizes="(max-width: 640px) calc(100vw - 1.5rem), 25vw"
                 />
@@ -44,9 +49,28 @@ export function VideosSection({ videos }: { videos: VideoItem[] }) {
               <p className="mt-1 text-xs text-fh-muted">
                 {video.views} views · {video.publishedAt}
               </p>
-            </Link>
-          </article>
-        ))}
+            </>
+          );
+
+          return (
+            <article key={video.id} className="group min-w-0">
+              {external ? (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full max-w-full"
+                >
+                  {inner}
+                </a>
+              ) : (
+                <Link href={href} className="block w-full max-w-full">
+                  {inner}
+                </Link>
+              )}
+            </article>
+          );
+        })}
       </div>
     </section>
   );

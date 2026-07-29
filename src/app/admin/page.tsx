@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { formatSriLankaDateTime } from "@/lib/datetime";
 import {
   getCmsOverviewStats,
   type CmsOverviewStats,
@@ -120,7 +121,7 @@ export default function AdminOverviewPage() {
                   </p>
                   <p className="text-xs text-fh-muted">
                     {a.updatedAt
-                      ? new Date(a.updatedAt).toLocaleString("si-LK")
+                      ? formatSriLankaDateTime(a.updatedAt)
                       : "—"}
                   </p>
                 </li>

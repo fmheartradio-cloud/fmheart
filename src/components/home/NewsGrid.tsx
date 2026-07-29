@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { CoverImage } from "@/components/ui/CoverImage";
 
 export type NewsCard = {
   id: string;
@@ -15,24 +15,26 @@ type NewsGridProps = {
   title: string;
   articles: NewsCard[];
   viewAllHref?: string;
+  /** Cap visible cards to this many grid rows (1 / 2 / 3 cols). */
+  maxRows?: number;
 };
 
-export function NewsGrid({ title, articles, viewAllHref = "#" }: NewsGridProps) {
+export function NewsGrid({
+  title,
+  articles,
+  viewAllHref = "#",
+  maxRows,
+}: NewsGridProps) {
   if (!articles.length) {
-    return (
-      <section>
-        <div className="mb-4 border-b-2 border-fh-red pb-2">
-          <h2 className="font-heading text-xl font-extrabold md:text-2xl">
-            {title}
-          </h2>
-        </div>
-        <p className="rounded-md border border-dashed border-neutral-300 bg-fh-surface px-4 py-8 text-center text-sm text-fh-muted">
-          තවම published articles නැහැ. CMS එකෙන් Status = <strong>Published</strong>{" "}
-          කරලා Save කරන්න.
-        </p>
-      </section>
-    );
+    return null;
   }
+
+  const rows = maxRows && maxRows > 0 ? maxRows : null;
+  // Cap at 3 columns × maxRows so large screens never grow past 2 rows.
+  const visible = rows ? articles.slice(0, rows * 3) : articles;
+  const mobileCap = rows ? rows * 1 : null;
+  const tabletCap = rows ? rows * 2 : null;
+  const desktopCap = rows ? rows * 3 : null;
 
   return (
     <section className="animate-fade-up w-full max-w-full min-w-0 overflow-x-clip">
@@ -48,20 +50,31 @@ export function NewsGrid({ title, articles, viewAllHref = "#" }: NewsGridProps) 
         </Link>
       </div>
 
-      <div className="grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {articles.map((article) => {
+      <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-5 lg:gap-6 xl:grid-cols-3">
+        {visible.map((article, i) => {
           const href = article.href || `/news/${article.slug}`;
+          const hideMobile =
+            mobileCap != null && i >= mobileCap ? "hidden" : "";
+          const showTablet =
+            tabletCap != null && i >= (mobileCap ?? 0) && i < tabletCap
+              ? "sm:block"
+              : "";
+          const hideTablet =
+            desktopCap != null && i >= (tabletCap ?? 0)
+              ? "sm:hidden lg:block"
+              : "";
           return (
-            <article key={article.id} className="group min-w-0">
+            <article
+              key={article.id}
+              className={`group min-w-0 ${hideMobile} ${showTablet} ${hideTablet}`.trim()}
+            >
               <Link href={href} className="block w-full max-w-full">
                 <div className="relative aspect-[16/10] w-full overflow-hidden bg-neutral-200">
-                  <Image
+                  <CoverImage
                     src={article.image}
-                    alt=""
                     fill
-                    unoptimized
                     className="object-cover transition duration-500 group-hover:scale-105"
-                    sizes="(max-width: 640px) calc(100vw - 1.5rem), (max-width: 1024px) calc(50vw - 1rem), 25vw"
+                    sizes="(max-width: 640px) calc(100vw - 1.5rem), (max-width: 1024px) calc(50vw - 1rem), 33vw"
                   />
                 </div>
                 <h3 className="font-news-headline mt-2.5 break-words text-[15px] leading-snug text-fh-ink transition group-hover:text-fh-red md:text-base">

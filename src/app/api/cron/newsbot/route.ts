@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { isAdminSdkConfigured } from "@/lib/firebase/admin";
 import { runNewsIngest } from "@/lib/newsbot/ingest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 function authorized(req: Request): boolean {
   const secret = process.env.CRON_SECRET?.trim();
@@ -25,6 +25,31 @@ async function handle(req: Request) {
           "FIREBASE_SERVICE_ACCOUNT_JSON missing. Add it in Vercel Environment Variables.",
       },
       { status: 503 },
+    );
+  }
+
+  const url = new URL(req.url);
+  // cron-job.org (~30s timeout): /api/cron/newsbot?async=1
+  // GitHub Actions / manual: default sync (waits for full ingest)
+  const asyncMode = url.searchParams.get("async") === "1";
+
+  if (asyncMode) {
+    const startedAt = new Date().toISOString();
+    after(async () => {
+      try {
+        await runNewsIngest({ maxPerSource: 8 });
+      } catch (err) {
+        console.error("[cron/newsbot] background ingest failed:", err);
+      }
+    });
+    return NextResponse.json(
+      {
+        ok: true,
+        accepted: true,
+        at: startedAt,
+        message: "News ingest started",
+      },
+      { status: 202 },
     );
   }
 
