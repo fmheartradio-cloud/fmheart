@@ -17,6 +17,8 @@ type NewsGridProps = {
   viewAllHref?: string;
   /** Cap visible cards to this many grid rows (1 / 2 / 3 cols). */
   maxRows?: number;
+  /** How many cards to show on mobile (1-col). Defaults to maxRows. */
+  mobileCount?: number;
 };
 
 export function NewsGrid({
@@ -24,17 +26,23 @@ export function NewsGrid({
   articles,
   viewAllHref = "#",
   maxRows,
+  mobileCount,
 }: NewsGridProps) {
   if (!articles.length) {
     return null;
   }
 
   const rows = maxRows && maxRows > 0 ? maxRows : null;
-  // Cap at 3 columns × maxRows so large screens never grow past 2 rows.
-  const visible = rows ? articles.slice(0, rows * 3) : articles;
-  const mobileCap = rows ? rows * 1 : null;
-  const tabletCap = rows ? rows * 2 : null;
-  const desktopCap = rows ? rows * 3 : null;
+  const mobileCap =
+    rows != null
+      ? mobileCount && mobileCount > 0
+        ? mobileCount
+        : rows * 1
+      : null;
+  const tabletCap = rows != null ? Math.max(rows * 2, mobileCap ?? 0) : null;
+  const desktopCap =
+    rows != null ? Math.max(rows * 3, tabletCap ?? 0, mobileCap ?? 0) : null;
+  const visible = desktopCap != null ? articles.slice(0, desktopCap) : articles;
 
   return (
     <section className="animate-fade-up w-full max-w-full min-w-0 overflow-x-clip">

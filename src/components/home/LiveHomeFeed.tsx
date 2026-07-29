@@ -134,6 +134,7 @@ export function LiveHomeFeed({
           articles={feed.news}
           viewAllHref="/news"
           maxRows={2}
+          mobileCount={4}
         />
       </div>
 
