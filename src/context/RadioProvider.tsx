@@ -89,6 +89,10 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   const wantPlayRef = useRef(false);
   const appleRef = useRef(false);
   const reconnectTimer = useRef<number | null>(null);
+  const waitingTimer = useRef<number | null>(null);
+  const watchdogTimer = useRef<number | null>(null);
+  const reconnectAttempts = useRef(0);
+  const lastProgressAt = useRef(0);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -97,6 +101,13 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   const [meta, setMeta] = useState<RadioMeta>(DEFAULT_META);
   const [recent, setRecent] = useState<RecentTrack[]>([]);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
+
+  const clearWaitingWatch = useCallback(() => {
+    if (waitingTimer.current != null) {
+      window.clearTimeout(waitingTimer.current);
+      waitingTimer.current = null;
+    }
+  }, []);
 
   const clearReconnect = useCallback(() => {
     if (reconnectTimer.current != null) {
@@ -150,8 +161,13 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       const sep = url.includes("#") ? "" : `#${Date.now()}`;
       audio.src = `${url}${sep}`;
     } else {
+      // Fresh connection on each assign — live streams die silently otherwise
+      const bust =
+        url.includes("?") || url.includes("#")
+          ? `${url}${url.includes("?") ? "&" : "#"}t=${Date.now()}`
+          : `${url}?t=${Date.now()}`;
       audio.crossOrigin = "anonymous";
-      audio.src = url;
+      audio.src = bust;
       audio.load();
     }
   }, []);
@@ -194,15 +210,29 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   const scheduleReconnect = useCallback(() => {
     if (!wantPlayRef.current) return;
     clearReconnect();
+    clearWaitingWatch();
+
+    const attempt = reconnectAttempts.current;
+    const delay = Math.min(1000 * Math.pow(2, attempt), 12000);
+    reconnectAttempts.current = attempt + 1;
+
     reconnectTimer.current = window.setTimeout(() => {
       if (!wantPlayRef.current || !audioRef.current) return;
       setIsLoading(true);
-      void startStream(false).catch(() => {
-        setError("Stream එක reconnect වුණේ නැහැ. Play නැවත ඔබන්න.");
-        setIsLoading(false);
+      setError(null);
+      // Alternate proxy/direct so a dead upstream path can recover
+      const preferProxy = attempt % 2 === 0;
+      void startStream(preferProxy).catch(() => {
+        if (!wantPlayRef.current) return;
+        if (reconnectAttempts.current >= 6) {
+          setError("Stream එක reconnect වුණේ නැහැ. Play නැවත ඔබන්න.");
+          setIsLoading(false);
+          return;
+        }
+        scheduleReconnect();
       });
-    }, 1500);
-  }, [clearReconnect, startStream]);
+    }, delay);
+  }, [clearReconnect, clearWaitingWatch, startStream]);
 
   useEffect(() => {
     appleRef.current = isAppleWebKitPlayback();
@@ -215,18 +245,41 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     audio.setAttribute("webkit-playsinline", "");
     audio.setAttribute("x-webkit-airplay", "allow");
 
+    const markProgress = () => {
+      lastProgressAt.current = Date.now();
+    };
+
     const onPlaying = () => {
       setIsPlaying(true);
       setIsLoading(false);
       setError(null);
+      reconnectAttempts.current = 0;
       clearReconnect();
+      clearWaitingWatch();
+      markProgress();
     };
     const onPause = () => {
+      clearWaitingWatch();
       if (!wantPlayRef.current) setIsPlaying(false);
     };
-    const onWaiting = () => setIsLoading(true);
-    const onCanPlay = () => setIsLoading(false);
+    const onWaiting = () => {
+      setIsLoading(true);
+      clearWaitingWatch();
+      // Live Icecast often stalls without error — force reconnect if stuck
+      waitingTimer.current = window.setTimeout(() => {
+        if (wantPlayRef.current) scheduleReconnect();
+      }, 8000);
+    };
+    const onCanPlay = () => {
+      setIsLoading(false);
+      clearWaitingWatch();
+      markProgress();
+    };
+    const onTimeUpdate = () => markProgress();
     const onStalled = () => {
+      if (wantPlayRef.current) scheduleReconnect();
+    };
+    const onEnded = () => {
       if (wantPlayRef.current) scheduleReconnect();
     };
     const onError = () => {
@@ -242,18 +295,47 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     audio.addEventListener("pause", onPause);
     audio.addEventListener("waiting", onWaiting);
     audio.addEventListener("canplay", onCanPlay);
+    audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("stalled", onStalled);
+    audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onError);
+
+    // Catch silent freezes / unexpected pauses without an error event
+    watchdogTimer.current = window.setInterval(() => {
+      if (!wantPlayRef.current || !audioRef.current) return;
+      if (reconnectTimer.current != null) return;
+      const el = audioRef.current;
+
+      // Stream dropped and element paused itself
+      if (el.paused) {
+        scheduleReconnect();
+        return;
+      }
+
+      // Buffer emptied and no recovery (HAVE_CURRENT_DATA = 2)
+      const stuck =
+        el.readyState < 2 &&
+        lastProgressAt.current > 0 &&
+        Date.now() - lastProgressAt.current > 10000;
+      if (stuck) scheduleReconnect();
+    }, 4000);
 
     return () => {
       wantPlayRef.current = false;
       clearReconnect();
+      clearWaitingWatch();
+      if (watchdogTimer.current != null) {
+        window.clearInterval(watchdogTimer.current);
+        watchdogTimer.current = null;
+      }
       audio.pause();
       audio.removeEventListener("playing", onPlaying);
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("waiting", onWaiting);
       audio.removeEventListener("canplay", onCanPlay);
+      audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("stalled", onStalled);
+      audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
       void ctxRef.current?.close();
       ctxRef.current = null;
@@ -261,7 +343,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       gainRef.current = null;
       sourceRef.current = null;
     };
-  }, [clearReconnect, scheduleReconnect]);
+  }, [clearReconnect, clearWaitingWatch, scheduleReconnect]);
 
   useEffect(() => {
     if (gainRef.current && !appleRef.current) {
@@ -339,9 +421,12 @@ export function RadioProvider({ children }: { children: ReactNode }) {
 
     // Mark intent synchronously inside the tap gesture
     wantPlayRef.current = true;
+    reconnectAttempts.current = 0;
+    lastProgressAt.current = Date.now();
     setIsLoading(true);
     setError(null);
     clearReconnect();
+    clearWaitingWatch();
 
     try {
       // Apple: do not await anything before play() except the play promise itself
@@ -379,12 +464,14 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         void err;
       }
     }
-  }, [assignStream, clearReconnect, startStream, volume]);
+  }, [assignStream, clearReconnect, clearWaitingWatch, startStream, volume]);
 
   const pause = useCallback(() => {
     const audio = audioRef.current;
     wantPlayRef.current = false;
+    reconnectAttempts.current = 0;
     clearReconnect();
+    clearWaitingWatch();
     if (!audio) return;
     audio.pause();
     // Keep src on Apple so resume is faster / more reliable
@@ -394,7 +481,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     }
     setIsPlaying(false);
     setIsLoading(false);
-  }, [clearReconnect]);
+  }, [clearReconnect, clearWaitingWatch]);
 
   const toggle = useCallback(async () => {
     if (wantPlayRef.current && (isPlaying || isLoading)) pause();
