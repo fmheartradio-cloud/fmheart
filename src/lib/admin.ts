@@ -1,5 +1,8 @@
 /** CMS / Firestore admin allowlist */
-const DEFAULT_ADMINS = ["fmheartradio@gmail.com"];
+const DEFAULT_ADMINS = [
+  "fmheartradio@gmail.com",
+  "narada.pathum@gmail.com",
+];
 
 export function getAdminEmails(): string[] {
   const fromEnv = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")

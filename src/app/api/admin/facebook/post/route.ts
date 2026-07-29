@@ -19,11 +19,33 @@ async function requireAdmin(request: Request) {
   const token = authHeader.startsWith("Bearer ")
     ? authHeader.slice("Bearer ".length).trim()
     : "";
-  if (!token) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  if (!token) {
+    return {
+      error: NextResponse.json(
+        { error: "Unauthorized — admin login required" },
+        { status: 401 },
+      ),
+    };
+  }
 
   const decoded = await verifyFirebaseIdToken(token);
-  if (!decoded || !isAdminEmail(decoded.email)) {
-    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  if (!decoded) {
+    return {
+      error: NextResponse.json(
+        { error: "Forbidden — invalid or expired admin session. Sign out and sign in again." },
+        { status: 403 },
+      ),
+    };
+  }
+  if (!isAdminEmail(decoded.email)) {
+    return {
+      error: NextResponse.json(
+        {
+          error: `Forbidden — ${decoded.email || "this account"} is not an admin email`,
+        },
+        { status: 403 },
+      ),
+    };
   }
   return { email: decoded.email };
 }
