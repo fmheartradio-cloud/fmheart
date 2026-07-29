@@ -39,10 +39,15 @@ export function NewsGrid({
         ? mobileCount
         : rows * 1
       : null;
-  const tabletCap = rows != null ? Math.max(rows * 2, mobileCap ?? 0) : null;
-  const desktopCap =
-    rows != null ? Math.max(rows * 3, tabletCap ?? 0, mobileCap ?? 0) : null;
-  const visible = desktopCap != null ? articles.slice(0, desktopCap) : articles;
+  const tabletCap = rows != null ? rows * 2 : null;
+  const desktopCap = rows != null ? rows * 3 : null;
+  const visibleCount = Math.max(
+    mobileCap ?? 0,
+    tabletCap ?? 0,
+    desktopCap ?? 0,
+  );
+  const visible =
+    visibleCount > 0 ? articles.slice(0, visibleCount) : articles;
 
   return (
     <section className="animate-fade-up w-full max-w-full min-w-0 overflow-x-clip">
@@ -61,21 +66,18 @@ export function NewsGrid({
       <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-5 lg:gap-6 xl:grid-cols-3">
         {visible.map((article, i) => {
           const href = article.href || `/news/${article.slug}`;
-          const hideMobile =
-            mobileCap != null && i >= mobileCap ? "hidden" : "";
-          const showTablet =
-            tabletCap != null && i >= (mobileCap ?? 0) && i < tabletCap
-              ? "sm:block"
-              : "";
-          const hideTablet =
-            desktopCap != null && i >= (tabletCap ?? 0)
-              ? "sm:hidden lg:block"
-              : "";
+          const classes = ["group", "min-w-0"];
+          if (mobileCap != null && i >= mobileCap) classes.push("hidden");
+          if (tabletCap != null) {
+            if (i >= tabletCap) classes.push("sm:hidden");
+            else if (mobileCap != null && i >= mobileCap) classes.push("sm:block");
+          }
+          if (desktopCap != null) {
+            if (i >= desktopCap) classes.push("lg:hidden");
+            else if (tabletCap != null && i >= tabletCap) classes.push("lg:block");
+          }
           return (
-            <article
-              key={article.id}
-              className={`group min-w-0 ${hideMobile} ${showTablet} ${hideTablet}`.trim()}
-            >
+            <article key={article.id} className={classes.join(" ")}>
               <Link href={href} className="block w-full max-w-full">
                 <div className="relative aspect-[16/10] w-full overflow-hidden bg-neutral-200">
                   <CoverImage
