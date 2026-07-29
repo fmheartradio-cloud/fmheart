@@ -51,6 +51,10 @@ const DEFAULT_META: RadioMeta = {
 const POLL_MS = 15_000;
 const MAX_RECENT = 8;
 const PROXY_STREAM = "/api/radio-stream";
+/** Vercel serverless proxy dies around maxDuration — never rely on it for long listens. */
+const STALL_RECONNECT_MS = 12_000;
+const WATCHDOG_MS = 5_000;
+const PROGRESS_STALE_MS = 15_000;
 
 /** Safari + all iOS browsers (Chrome/Firefox on iOS are WebKit too). */
 function isAppleWebKitPlayback() {
@@ -62,9 +66,7 @@ function isAppleWebKitPlayback() {
   const safariDesktop =
     /Safari/.test(ua) &&
     !/Chrome|Chromium|Edg|Firefox|OPR|Android/i.test(ua);
-  // CriOS / FxiOS still WebKit on iOS
-  const iOSBrowser = iOS;
-  return iOSBrowser || safariDesktop;
+  return iOS || safariDesktop;
 }
 
 function formatClock(d = new Date()) {
@@ -77,6 +79,13 @@ function formatClock(d = new Date()) {
 
 function trackKey(song: string, artist: string) {
   return `${song.trim().toLowerCase()}::${artist.trim().toLowerCase()}`;
+}
+
+function withCacheBust(url: string) {
+  const t = Date.now();
+  if (url.includes("#")) return `${url}&_=${t}`;
+  if (url.includes("?")) return `${url}&_=${t}`;
+  return `${url}?_=${t}`;
 }
 
 export function RadioProvider({ children }: { children: ReactNode }) {
@@ -93,6 +102,8 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   const watchdogTimer = useRef<number | null>(null);
   const reconnectAttempts = useRef(0);
   const lastProgressAt = useRef(0);
+  const reconnectingRef = useRef(false);
+  const usingProxyRef = useRef(false);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -116,6 +127,11 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * Web Audio needs CORS. Upstream Icecast has no CORS, so analyser only works
+   * via same-origin proxy — which Vercel kills after a few minutes.
+   * Prefer direct playback without Web Audio for uninterrupted listening.
+   */
   const ensureGraph = useCallback(async () => {
     const audio = audioRef.current;
     if (!audio || appleRef.current) return;
@@ -152,25 +168,39 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     }
   }, [volume]);
 
-  const assignStream = useCallback((audio: HTMLAudioElement, url: string) => {
-    audio.muted = false;
-    if (appleRef.current) {
+  const assignStream = useCallback(
+    (audio: HTMLAudioElement, url: string, mode: "direct" | "proxy") => {
+      audio.muted = false;
+      usingProxyRef.current = mode === "proxy";
+
+      if (appleRef.current) {
+        audio.removeAttribute("crossorigin");
+        audio.removeAttribute("crossOrigin");
+        audio.src = `${url}${url.includes("#") ? "" : `#${Date.now()}`}`;
+        return;
+      }
+
+      if (mode === "proxy") {
+        // CORS-enabled same-origin proxy (needed only for Web Audio analyser)
+        audio.crossOrigin = "anonymous";
+        audio.src = withCacheBust(url);
+        audio.load();
+        return;
+      }
+
+      // Direct Icecast — no CORS attribute (host does not send ACAO)
       audio.removeAttribute("crossorigin");
       audio.removeAttribute("crossOrigin");
-      // Fragment busts cache without breaking Icecast query parsing
-      const sep = url.includes("#") ? "" : `#${Date.now()}`;
-      audio.src = `${url}${sep}`;
-    } else {
-      // Fresh connection on each assign — live streams die silently otherwise
-      const bust =
-        url.includes("?") || url.includes("#")
-          ? `${url}${url.includes("?") ? "&" : "#"}t=${Date.now()}`
-          : `${url}?t=${Date.now()}`;
-      audio.crossOrigin = "anonymous";
-      audio.src = bust;
-      audio.load();
-    }
-  }, []);
+      audio.src = withCacheBust(url);
+      // Avoid load() when possible — it can cancel and flash silence
+      try {
+        audio.load();
+      } catch {
+        /* ignore */
+      }
+    },
+    [],
+  );
 
   const startStream = useCallback(
     async (preferProxy: boolean) => {
@@ -181,23 +211,29 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       const proxy = `${PROXY_STREAM}?t=${Date.now()}`;
 
       if (appleRef.current) {
-        // Direct HTTPS Icecast — no Web Audio, no query bust, no load()
         audio.volume = volume;
-        assignStream(audio, direct);
+        assignStream(audio, direct, "direct");
         await audio.play();
         return;
       }
 
+      // Stable path: direct stream, element volume (no Web Audio / no Vercel proxy)
+      if (!preferProxy) {
+        audio.volume = volume;
+        assignStream(audio, direct, "direct");
+        await audio.play();
+        return;
+      }
+
+      // Proxy path only as short fallback (analyser + CORS); expect periodic reconnect
       await ensureGraph();
       audio.volume = 1;
-      const primary = preferProxy ? proxy : direct;
-      const fallback = preferProxy ? direct : proxy;
       try {
-        assignStream(audio, primary);
+        assignStream(audio, proxy, "proxy");
         await audio.play();
       } catch {
-        audio.removeAttribute("crossOrigin");
-        assignStream(audio, fallback);
+        audio.volume = volume;
+        assignStream(audio, direct, "direct");
         await audio.play();
       }
       if (ctxRef.current?.state === "suspended") {
@@ -209,28 +245,42 @@ export function RadioProvider({ children }: { children: ReactNode }) {
 
   const scheduleReconnect = useCallback(() => {
     if (!wantPlayRef.current) return;
+    if (reconnectingRef.current && reconnectTimer.current != null) return;
+
     clearReconnect();
     clearWaitingWatch();
+    reconnectingRef.current = true;
 
     const attempt = reconnectAttempts.current;
-    const delay = Math.min(1000 * Math.pow(2, attempt), 12000);
+    const delay = Math.min(800 * Math.pow(1.6, attempt), 8000);
     reconnectAttempts.current = attempt + 1;
 
     reconnectTimer.current = window.setTimeout(() => {
-      if (!wantPlayRef.current || !audioRef.current) return;
+      if (!wantPlayRef.current || !audioRef.current) {
+        reconnectingRef.current = false;
+        return;
+      }
       setIsLoading(true);
       setError(null);
-      // Alternate proxy/direct so a dead upstream path can recover
-      const preferProxy = attempt % 2 === 0;
-      void startStream(preferProxy).catch(() => {
-        if (!wantPlayRef.current) return;
-        if (reconnectAttempts.current >= 6) {
-          setError("Stream එක reconnect වුණේ නැහැ. Play නැවත ඔබන්න.");
-          setIsLoading(false);
-          return;
-        }
-        scheduleReconnect();
-      });
+      // Always prefer direct after drops — proxy times out on Vercel
+      void startStream(false)
+        .then(() => {
+          reconnectingRef.current = false;
+        })
+        .catch(() => {
+          if (!wantPlayRef.current) {
+            reconnectingRef.current = false;
+            return;
+          }
+          if (reconnectAttempts.current >= 8) {
+            setError("Stream එක reconnect වුණේ නැහැ. Play නැවත ඔබන්න.");
+            setIsLoading(false);
+            reconnectingRef.current = false;
+            return;
+          }
+          reconnectingRef.current = false;
+          scheduleReconnect();
+        });
     }, delay);
   }, [clearReconnect, clearWaitingWatch, startStream]);
 
@@ -254,6 +304,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
       setError(null);
       reconnectAttempts.current = 0;
+      reconnectingRef.current = false;
       clearReconnect();
       clearWaitingWatch();
       markProgress();
@@ -265,10 +316,9 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     const onWaiting = () => {
       setIsLoading(true);
       clearWaitingWatch();
-      // Live Icecast often stalls without error — force reconnect if stuck
       waitingTimer.current = window.setTimeout(() => {
         if (wantPlayRef.current) scheduleReconnect();
-      }, 8000);
+      }, STALL_RECONNECT_MS);
     };
     const onCanPlay = () => {
       setIsLoading(false);
@@ -277,7 +327,11 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     };
     const onTimeUpdate = () => markProgress();
     const onStalled = () => {
-      if (wantPlayRef.current) scheduleReconnect();
+      // Brief stalls are normal — only reconnect if it persists
+      clearWaitingWatch();
+      waitingTimer.current = window.setTimeout(() => {
+        if (wantPlayRef.current) scheduleReconnect();
+      }, STALL_RECONNECT_MS);
     };
     const onEnded = () => {
       if (wantPlayRef.current) scheduleReconnect();
@@ -300,30 +354,36 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onError);
 
-    // Catch silent freezes / unexpected pauses without an error event
     watchdogTimer.current = window.setInterval(() => {
       if (!wantPlayRef.current || !audioRef.current) return;
-      if (reconnectTimer.current != null) return;
+      if (reconnectingRef.current || reconnectTimer.current != null) return;
       const el = audioRef.current;
 
-      // Stream dropped and element paused itself
       if (el.paused) {
         scheduleReconnect();
         return;
       }
 
-      // Buffer emptied and no recovery (HAVE_CURRENT_DATA = 2)
-      const stuck =
-        el.readyState < 2 &&
+      const stale =
         lastProgressAt.current > 0 &&
-        Date.now() - lastProgressAt.current > 10000;
-      if (stuck) scheduleReconnect();
-    }, 4000);
+        Date.now() - lastProgressAt.current > PROGRESS_STALE_MS;
+      const bufferEmpty = el.readyState < 2;
+      if (stale && bufferEmpty) scheduleReconnect();
+    }, WATCHDOG_MS);
+
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!wantPlayRef.current || !audioRef.current) return;
+      if (audioRef.current.paused) scheduleReconnect();
+      else void audioRef.current.play().catch(() => scheduleReconnect());
+    };
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       wantPlayRef.current = false;
       clearReconnect();
       clearWaitingWatch();
+      document.removeEventListener("visibilitychange", onVisibility);
       if (watchdogTimer.current != null) {
         window.clearInterval(watchdogTimer.current);
         watchdogTimer.current = null;
@@ -346,7 +406,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   }, [clearReconnect, clearWaitingWatch, scheduleReconnect]);
 
   useEffect(() => {
-    if (gainRef.current && !appleRef.current) {
+    if (gainRef.current && usingProxyRef.current && !appleRef.current) {
       gainRef.current.gain.value = volume;
     } else if (audioRef.current) {
       audioRef.current.volume = volume;
@@ -419,9 +479,9 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     const audio = audioRef.current;
     if (!audio) return;
 
-    // Mark intent synchronously inside the tap gesture
     wantPlayRef.current = true;
     reconnectAttempts.current = 0;
+    reconnectingRef.current = false;
     lastProgressAt.current = Date.now();
     setIsLoading(true);
     setError(null);
@@ -429,25 +489,25 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     clearWaitingWatch();
 
     try {
-      // Apple: do not await anything before play() except the play promise itself
       if (appleRef.current) {
         audio.muted = false;
         audio.volume = volume;
-        assignStream(audio, SITE.streamUrl);
+        assignStream(audio, SITE.streamUrl, "direct");
         await audio.play();
       } else {
-        await startStream(true);
+        // Direct Icecast first — avoids Vercel proxy ~5 min cutoff
+        await startStream(false);
       }
     } catch (err) {
       try {
-        // Fallback: same-origin proxy (HTTPS) without Web Audio on Apple
         audio.muted = false;
         audio.volume = volume;
         if (appleRef.current) {
-          assignStream(audio, `${PROXY_STREAM}?t=${Date.now()}`);
+          assignStream(audio, `${PROXY_STREAM}?t=${Date.now()}`, "direct");
           await audio.play();
         } else {
-          await startStream(false);
+          // Last resort: proxy (may drop after a few minutes)
+          await startStream(true);
         }
       } catch (err2) {
         wantPlayRef.current = false;
@@ -470,11 +530,11 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     const audio = audioRef.current;
     wantPlayRef.current = false;
     reconnectAttempts.current = 0;
+    reconnectingRef.current = false;
     clearReconnect();
     clearWaitingWatch();
     if (!audio) return;
     audio.pause();
-    // Keep src on Apple so resume is faster / more reliable
     if (!appleRef.current) {
       audio.removeAttribute("src");
       audio.load();
@@ -523,12 +583,10 @@ export function RadioProvider({ children }: { children: ReactNode }) {
 
   return (
     <RadioContext.Provider value={value}>
-      {/* DOM-attached audio is required for reliable iOS playback */}
       <audio
         ref={audioRef}
         preload="none"
         playsInline
-        // Keep in layout (not display:none) — opacity trick for WebKit
         className="pointer-events-none fixed top-0 left-0 h-px w-px opacity-0"
         aria-hidden
       />

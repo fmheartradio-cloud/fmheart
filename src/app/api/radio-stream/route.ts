@@ -6,8 +6,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
- * Same-origin Icecast proxy so the browser can use Web Audio AnalyserNode
- * (upstream cast host does not send CORS headers).
+ * Same-origin Icecast proxy for Web Audio AnalyserNode only.
+ * Do NOT use for long listening — Vercel maxDuration cuts the stream (~5 min).
+ * Primary playback uses SITE.streamUrl directly from the browser.
  */
 export async function GET() {
   try {
