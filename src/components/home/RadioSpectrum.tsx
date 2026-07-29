@@ -35,7 +35,8 @@ function fillLogBars(
       n++;
     }
     const avg = n > 0 ? sum / n / 255 : 0;
-    out[i] = Math.pow(avg, 1.05);
+    // Slight boost so quiet streams still read clearly
+    out[i] = Math.min(1, Math.pow(avg, 0.85) * 1.35);
   }
 }
 
@@ -59,7 +60,6 @@ function fillSimulatedBars(
 
   for (let i = 0; i < out.length; i++) {
     const x = i / (out.length - 1);
-    // Bass / mid / presence envelope (radio-like)
     const bass = Math.exp(-Math.pow((x - 0.12) / 0.14, 2));
     const mid = Math.exp(-Math.pow((x - 0.42) / 0.22, 2));
     const high = Math.exp(-Math.pow((x - 0.78) / 0.2, 2));
@@ -74,7 +74,6 @@ function fillSimulatedBars(
       0.5 + 0.5 * Math.sin(t * 21 + i * 1.3) * Math.sin(t * 3.4 + x * 5);
 
     let v = shape * (0.45 + 0.55 * pulse) * (0.75 + 0.25 * flutter) * vol;
-    // Occasional transient peaks
     const hit = Math.sin(t * 2.15 + i * 0.31);
     if (hit > 0.92) v *= 1.35;
     out[i] = Math.min(1, Math.max(0.04, v));
@@ -82,12 +81,12 @@ function fillSimulatedBars(
 }
 
 /**
- * Spectrum: real AnalyserNode on Chromium; simulated motion on Apple WebKit
- * (Safari cannot FFT live Icecast via createMediaElementSource without muting).
+ * Spectrum: real AnalyserNode on Chromium/Android; simulated motion on Apple WebKit.
  */
 export function RadioSpectrum({ className }: Props) {
-  const { isPlaying, isLoading, analyser, volume } = useRadio();
+  const { isPlaying, isLoading, analyser, volume, spectrumMode } = useRadio();
   const active = isPlaying || isLoading;
+  const useRealtime = spectrumMode === "realtime" && Boolean(analyser);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const peaksRef = useRef<Float32Array>(new Float32Array(BAR_COUNT));
@@ -131,7 +130,8 @@ export function RadioSpectrum({ className }: Props) {
       const plotH = h - pad * 2;
 
       let hasSignal = false;
-      if (analyser && active) {
+
+      if (useRealtime && analyser && active) {
         const binCount = analyser.frequencyBinCount;
         if (!freqRef.current || freqRef.current.length !== binCount) {
           freqRef.current = new Uint8Array(binCount);
@@ -142,22 +142,29 @@ export function RadioSpectrum({ className }: Props) {
         let energy = 0;
         for (let i = 0; i < targets.length; i++) energy += targets[i]!;
         energy /= targets.length;
-        hasSignal = energy > 0.02;
+        hasSignal = energy > 0.008;
 
-        const volScale = 0.75 + Math.min(1, volume) * 0.35;
+        const volScale = 0.85 + Math.min(1, volume) * 0.35;
         for (let i = 0; i < targets.length; i++) {
-          targets[i]! *= volScale;
+          targets[i]! = Math.min(1, targets[i]! * volScale);
         }
-      }
 
-      if (!hasSignal) {
+        // Quiet moments: keep real (near-zero) bars — do not fake simulate
+        if (!hasSignal) {
+          for (let i = 0; i < targets.length; i++) {
+            targets[i] = Math.max(targets[i]!, 0.02);
+          }
+        }
+      } else {
+        // Apple / no analyser: keep the existing simulated look
         fillSimulatedBars(targets, now, volume, active);
+        hasSignal = active;
       }
 
-      const lively = active && (hasSignal || isPlaying);
-      const attack = lively ? 0.28 : 0.08;
-      const release = lively ? 0.16 : 0.07;
-      const peakFall = lively ? 0.55 : 0.35;
+      const lively = active && (hasSignal || isPlaying || !useRealtime);
+      const attack = lively ? 0.32 : 0.08;
+      const release = lively ? 0.18 : 0.07;
+      const peakFall = lively ? 0.6 : 0.35;
 
       for (let i = 0; i < BAR_COUNT; i++) {
         const target = Math.min(1, targets[i]!);
@@ -227,7 +234,7 @@ export function RadioSpectrum({ className }: Props) {
 
     rafRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [active, analyser, volume, isPlaying]);
+  }, [active, analyser, volume, isPlaying, useRealtime]);
 
   return (
     <div

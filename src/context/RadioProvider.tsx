@@ -33,6 +33,8 @@ type RadioContextValue = {
   meta: RadioMeta;
   recent: RecentTrack[];
   analyser: AnalyserNode | null;
+  /** Apple/WebKit: simulated bars. Others: real FFT when analyser is live. */
+  spectrumMode: "realtime" | "simulated";
   play: () => Promise<void>;
   pause: () => void;
   toggle: () => Promise<void>;
@@ -92,7 +94,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const gainRef = useRef<GainNode | null>(null);
-  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const sourceRef = useRef<AudioNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const prevMetaRef = useRef<RadioMeta>(DEFAULT_META);
   const wantPlayRef = useRef(false);
@@ -109,6 +111,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     async () => {},
   );
   const scheduleReconnectRef = useRef<() => void>(() => {});
+  const ensureCaptureAnalyserRef = useRef<() => Promise<void>>(async () => {});
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -117,6 +120,9 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   const [meta, setMeta] = useState<RadioMeta>(DEFAULT_META);
   const [recent, setRecent] = useState<RecentTrack[]>([]);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
+  const [spectrumMode, setSpectrumMode] = useState<"realtime" | "simulated">(
+    "simulated",
+  );
 
   volumeRef.current = volume;
 
@@ -135,10 +141,69 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * Web Audio needs CORS. Upstream Icecast has no CORS, so analyser only works
-   * via same-origin proxy — which Vercel kills after a few minutes.
-   * Prefer direct playback without Web Audio for uninterrupted listening.
+   * Real spectrum without CORS / Vercel proxy:
+   * play Icecast on the <audio> element, tap output via captureStream → AnalyserNode.
+   * Apple/WebKit: skip (captureStream / MediaElementSource unreliable for live radio).
    */
+  const disconnectCaptureAnalyser = useCallback(() => {
+    try {
+      sourceRef.current?.disconnect();
+    } catch {
+      /* ignore */
+    }
+    sourceRef.current = null;
+  }, []);
+
+  const ensureCaptureAnalyser = useCallback(async () => {
+    const audio = audioRef.current;
+    if (!audio || appleRef.current) return;
+
+    const el = audio as HTMLAudioElement & {
+      captureStream?: () => MediaStream;
+      mozCaptureStream?: () => MediaStream;
+    };
+    const capture =
+      typeof el.captureStream === "function"
+        ? el.captureStream()
+        : typeof el.mozCaptureStream === "function"
+          ? el.mozCaptureStream()
+          : null;
+    if (!capture) return;
+
+    const Ctx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext;
+    if (!ctxRef.current) {
+      ctxRef.current = new Ctx();
+    }
+    const ctx = ctxRef.current;
+    if (ctx.state === "suspended") {
+      await ctx.resume();
+    }
+
+    if (!analyserRef.current) {
+      const analyserNode = ctx.createAnalyser();
+      analyserNode.fftSize = 2048;
+      analyserNode.smoothingTimeConstant = 0.65;
+      analyserNode.minDecibels = -90;
+      analyserNode.maxDecibels = -20;
+      analyserRef.current = analyserNode;
+      setAnalyser(analyserNode);
+    }
+
+    disconnectCaptureAnalyser();
+    try {
+      const source = ctx.createMediaStreamSource(capture);
+      // Analyse only — element already outputs audible audio
+      source.connect(analyserRef.current);
+      sourceRef.current = source;
+    } catch (err) {
+      console.warn("[radio] capture analyser failed:", err);
+    }
+  }, [disconnectCaptureAnalyser]);
+
+  /** Legacy proxy + MediaElementSource path (fallback only). */
   const ensureGraph = useCallback(async () => {
     const audio = audioRef.current;
     if (!audio || appleRef.current) return;
@@ -150,14 +215,15 @@ export function RadioProvider({ children }: { children: ReactNode }) {
           .webkitAudioContext;
       const ctx = new Ctx();
       const analyserNode = ctx.createAnalyser();
-      analyserNode.fftSize = 1024;
-      analyserNode.smoothingTimeConstant = 0.72;
-      analyserNode.minDecibels = -78;
-      analyserNode.maxDecibels = -10;
+      analyserNode.fftSize = 2048;
+      analyserNode.smoothingTimeConstant = 0.65;
+      analyserNode.minDecibels = -90;
+      analyserNode.maxDecibels = -20;
 
       const gain = ctx.createGain();
       gain.gain.value = volumeRef.current;
 
+      disconnectCaptureAnalyser();
       const source = ctx.createMediaElementSource(audio);
       source.connect(analyserNode);
       analyserNode.connect(gain);
@@ -173,7 +239,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     if (ctxRef.current.state === "suspended") {
       await ctxRef.current.resume();
     }
-  }, []);
+  }, [disconnectCaptureAnalyser]);
 
   const assignStream = useCallback(
     (audio: HTMLAudioElement, url: string, mode: "direct" | "proxy") => {
@@ -294,9 +360,11 @@ export function RadioProvider({ children }: { children: ReactNode }) {
 
   startStreamRef.current = startStream;
   scheduleReconnectRef.current = scheduleReconnect;
+  ensureCaptureAnalyserRef.current = ensureCaptureAnalyser;
 
   useEffect(() => {
     appleRef.current = isAppleWebKitPlayback();
+    setSpectrumMode(appleRef.current ? "simulated" : "realtime");
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -324,6 +392,10 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       clearReconnect();
       clearWaitingWatch();
       markProgress();
+      // Real FFT via captureStream (Chromium). Skip if proxy MediaElementSource graph is active.
+      if (!appleRef.current && !gainRef.current) {
+        void ensureCaptureAnalyserRef.current();
+      }
     };
     const onPause = () => {
       clearWaitingWatch();
@@ -567,6 +639,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     reconnectingRef.current = false;
     clearReconnect();
     clearWaitingWatch();
+    disconnectCaptureAnalyser();
     if (!audio) return;
     audio.pause();
     if (!appleRef.current) {
@@ -575,7 +648,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     }
     setIsPlaying(false);
     setIsLoading(false);
-  }, [clearReconnect, clearWaitingWatch]);
+  }, [clearReconnect, clearWaitingWatch, disconnectCaptureAnalyser]);
 
   const toggle = useCallback(async () => {
     // Intent flag only — avoids resume/pause races with loading UI state
@@ -596,6 +669,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       meta,
       recent,
       analyser,
+      spectrumMode,
       play,
       pause,
       toggle,
@@ -609,6 +683,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       meta,
       recent,
       analyser,
+      spectrumMode,
       play,
       pause,
       toggle,
