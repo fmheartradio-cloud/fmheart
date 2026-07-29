@@ -97,6 +97,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   const prevMetaRef = useRef<RadioMeta>(DEFAULT_META);
   const wantPlayRef = useRef(false);
   const appleRef = useRef(false);
+  const volumeRef = useRef(0.85);
   const reconnectTimer = useRef<number | null>(null);
   const waitingTimer = useRef<number | null>(null);
   const watchdogTimer = useRef<number | null>(null);
@@ -104,6 +105,10 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   const lastProgressAt = useRef(0);
   const reconnectingRef = useRef(false);
   const usingProxyRef = useRef(false);
+  const startStreamRef = useRef<(preferProxy: boolean) => Promise<void>>(
+    async () => {},
+  );
+  const scheduleReconnectRef = useRef<() => void>(() => {});
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -112,6 +117,8 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   const [meta, setMeta] = useState<RadioMeta>(DEFAULT_META);
   const [recent, setRecent] = useState<RecentTrack[]>([]);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
+
+  volumeRef.current = volume;
 
   const clearWaitingWatch = useCallback(() => {
     if (waitingTimer.current != null) {
@@ -149,7 +156,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       analyserNode.maxDecibels = -10;
 
       const gain = ctx.createGain();
-      gain.gain.value = volume;
+      gain.gain.value = volumeRef.current;
 
       const source = ctx.createMediaElementSource(audio);
       source.connect(analyserNode);
@@ -166,7 +173,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     if (ctxRef.current.state === "suspended") {
       await ctxRef.current.resume();
     }
-  }, [volume]);
+  }, []);
 
   const assignStream = useCallback(
     (audio: HTMLAudioElement, url: string, mode: "direct" | "proxy") => {
@@ -206,12 +213,13 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     async (preferProxy: boolean) => {
       const audio = audioRef.current;
       if (!audio) return;
+      const vol = volumeRef.current;
 
       const direct = SITE.streamUrl;
       const proxy = `${PROXY_STREAM}?t=${Date.now()}`;
 
       if (appleRef.current) {
-        audio.volume = volume;
+        audio.volume = vol;
         assignStream(audio, direct, "direct");
         await audio.play();
         return;
@@ -219,7 +227,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
 
       // Stable path: direct stream, element volume (no Web Audio / no Vercel proxy)
       if (!preferProxy) {
-        audio.volume = volume;
+        audio.volume = vol;
         assignStream(audio, direct, "direct");
         await audio.play();
         return;
@@ -232,7 +240,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         assignStream(audio, proxy, "proxy");
         await audio.play();
       } catch {
-        audio.volume = volume;
+        audio.volume = vol;
         assignStream(audio, direct, "direct");
         await audio.play();
       }
@@ -240,7 +248,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         await ctxRef.current.resume();
       }
     },
-    [assignStream, ensureGraph, volume],
+    [assignStream, ensureGraph],
   );
 
   const scheduleReconnect = useCallback(() => {
@@ -284,6 +292,9 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     }, delay);
   }, [clearReconnect, clearWaitingWatch, startStream]);
 
+  startStreamRef.current = startStream;
+  scheduleReconnectRef.current = scheduleReconnect;
+
   useEffect(() => {
     appleRef.current = isAppleWebKitPlayback();
     const audio = audioRef.current;
@@ -300,6 +311,11 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     };
 
     const onPlaying = () => {
+      // Ignore unexpected resume after intentional pause
+      if (!wantPlayRef.current) {
+        audio.pause();
+        return;
+      }
       setIsPlaying(true);
       setIsLoading(false);
       setError(null);
@@ -314,10 +330,11 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       if (!wantPlayRef.current) setIsPlaying(false);
     };
     const onWaiting = () => {
+      if (!wantPlayRef.current) return;
       setIsLoading(true);
       clearWaitingWatch();
       waitingTimer.current = window.setTimeout(() => {
-        if (wantPlayRef.current) scheduleReconnect();
+        if (wantPlayRef.current) scheduleReconnectRef.current();
       }, STALL_RECONNECT_MS);
     };
     const onCanPlay = () => {
@@ -327,18 +344,18 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     };
     const onTimeUpdate = () => markProgress();
     const onStalled = () => {
-      // Brief stalls are normal — only reconnect if it persists
+      if (!wantPlayRef.current) return;
       clearWaitingWatch();
       waitingTimer.current = window.setTimeout(() => {
-        if (wantPlayRef.current) scheduleReconnect();
+        if (wantPlayRef.current) scheduleReconnectRef.current();
       }, STALL_RECONNECT_MS);
     };
     const onEnded = () => {
-      if (wantPlayRef.current) scheduleReconnect();
+      if (wantPlayRef.current) scheduleReconnectRef.current();
     };
     const onError = () => {
       setIsLoading(false);
-      if (wantPlayRef.current) scheduleReconnect();
+      if (wantPlayRef.current) scheduleReconnectRef.current();
       else {
         setIsPlaying(false);
         setError("Stream එක connect වුණේ නැහැ. නැවත try කරන්න.");
@@ -355,12 +372,13 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     audio.addEventListener("error", onError);
 
     watchdogTimer.current = window.setInterval(() => {
+      // Never auto-resume after an intentional pause
       if (!wantPlayRef.current || !audioRef.current) return;
       if (reconnectingRef.current || reconnectTimer.current != null) return;
       const el = audioRef.current;
 
       if (el.paused) {
-        scheduleReconnect();
+        scheduleReconnectRef.current();
         return;
       }
 
@@ -368,27 +386,28 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         lastProgressAt.current > 0 &&
         Date.now() - lastProgressAt.current > PROGRESS_STALE_MS;
       const bufferEmpty = el.readyState < 2;
-      if (stale && bufferEmpty) scheduleReconnect();
+      if (stale && bufferEmpty) scheduleReconnectRef.current();
     }, WATCHDOG_MS);
 
     const onVisibility = () => {
       if (document.visibilityState !== "visible") return;
       if (!wantPlayRef.current || !audioRef.current) return;
-      if (audioRef.current.paused) scheduleReconnect();
-      else void audioRef.current.play().catch(() => scheduleReconnect());
+      if (audioRef.current.paused) scheduleReconnectRef.current();
+      else
+        void audioRef.current
+          .play()
+          .catch(() => scheduleReconnectRef.current());
     };
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      wantPlayRef.current = false;
-      clearReconnect();
-      clearWaitingWatch();
+      // Listener teardown only — do NOT pause / clear wantPlay here.
+      // Volume changes used to recreate this effect and kill playback.
       document.removeEventListener("visibilitychange", onVisibility);
       if (watchdogTimer.current != null) {
         window.clearInterval(watchdogTimer.current);
         watchdogTimer.current = null;
       }
-      audio.pause();
       audio.removeEventListener("playing", onPlaying);
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("waiting", onWaiting);
@@ -397,13 +416,27 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener("stalled", onStalled);
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
+    };
+  }, [clearReconnect, clearWaitingWatch]);
+
+  // True unmount cleanup only
+  useEffect(() => {
+    return () => {
+      wantPlayRef.current = false;
+      clearReconnect();
+      clearWaitingWatch();
+      const audio = audioRef.current;
+      if (audio) {
+        audio.pause();
+        audio.removeAttribute("src");
+      }
       void ctxRef.current?.close();
       ctxRef.current = null;
       analyserRef.current = null;
       gainRef.current = null;
       sourceRef.current = null;
     };
-  }, [clearReconnect, clearWaitingWatch, scheduleReconnect]);
+  }, [clearReconnect, clearWaitingWatch]);
 
   useEffect(() => {
     if (gainRef.current && usingProxyRef.current && !appleRef.current) {
@@ -478,6 +511,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   const play = useCallback(async () => {
     const audio = audioRef.current;
     if (!audio) return;
+    const vol = volumeRef.current;
 
     wantPlayRef.current = true;
     reconnectAttempts.current = 0;
@@ -491,7 +525,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     try {
       if (appleRef.current) {
         audio.muted = false;
-        audio.volume = volume;
+        audio.volume = vol;
         assignStream(audio, SITE.streamUrl, "direct");
         await audio.play();
       } else {
@@ -501,7 +535,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       try {
         audio.muted = false;
-        audio.volume = volume;
+        audio.volume = vol;
         if (appleRef.current) {
           assignStream(audio, `${PROXY_STREAM}?t=${Date.now()}`, "direct");
           await audio.play();
@@ -524,7 +558,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         void err;
       }
     }
-  }, [assignStream, clearReconnect, clearWaitingWatch, startStream, volume]);
+  }, [assignStream, clearReconnect, clearWaitingWatch, startStream]);
 
   const pause = useCallback(() => {
     const audio = audioRef.current;
@@ -544,9 +578,10 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   }, [clearReconnect, clearWaitingWatch]);
 
   const toggle = useCallback(async () => {
-    if (wantPlayRef.current && (isPlaying || isLoading)) pause();
+    // Intent flag only — avoids resume/pause races with loading UI state
+    if (wantPlayRef.current) pause();
     else await play();
-  }, [isPlaying, isLoading, pause, play]);
+  }, [pause, play]);
 
   const setVolume = useCallback((v: number) => {
     setVolumeState(Math.min(1, Math.max(0, v)));

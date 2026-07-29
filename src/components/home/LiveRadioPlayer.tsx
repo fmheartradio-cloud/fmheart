@@ -71,6 +71,8 @@ export function LiveRadioPlayer() {
             step={0.01}
             value={volume}
             onChange={(e) => setVolume(Number(e.target.value))}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
             className="w-full accent-fh-red"
           />
         </label>
