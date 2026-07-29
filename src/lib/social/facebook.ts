@@ -126,3 +126,87 @@ export async function postArticleToFacebookPage(
     };
   }
 }
+
+export function isNewsbotFacebookAutoPostEnabled(): boolean {
+  if (process.env.FACEBOOK_NEWSBOT_AUTO_POST === "false") return false;
+  if (process.env.FACEBOOK_NEWSBOT_AUTO_POST === "true") {
+    return isFacebookAutoPostConfigured();
+  }
+  // Default: follow main Facebook auto-post config
+  return isFacebookAutoPostConfigured();
+}
+
+export function newsbotFacebookMaxPerRun(): number {
+  const raw = Number(process.env.FACEBOOK_NEWSBOT_MAX_PER_RUN || "5");
+  if (!Number.isFinite(raw) || raw < 0) return 5;
+  return Math.min(Math.floor(raw), 20);
+}
+
+type ArticleFacebookFields = {
+  title?: unknown;
+  excerpt?: unknown;
+  slug?: unknown;
+  type?: unknown;
+  category?: unknown;
+  breaking?: unknown;
+  status?: unknown;
+  facebookPostId?: unknown;
+};
+
+/** Post a Firestore article to Facebook and save post id on the doc. */
+export async function postFirestoreArticleToFacebook(options: {
+  articleId: string;
+  data: ArticleFacebookFields;
+  update: (fields: Record<string, unknown>) => Promise<void>;
+  force?: boolean;
+}): Promise<FacebookPostResult | FacebookPostError | { ok: true; skipped: true; reason: string }> {
+  if (!isFacebookAutoPostConfigured()) {
+    return { ok: false, error: "Facebook auto-post not configured" };
+  }
+
+  const status = String(options.data.status || "");
+  if (status && status !== "published") {
+    return { ok: true, skipped: true, reason: "not_published" };
+  }
+
+  const existingId = String(options.data.facebookPostId || "").trim();
+  if (existingId && !options.force) {
+    return { ok: true, skipped: true, reason: "already_posted" };
+  }
+
+  const title = String(options.data.title || "").trim();
+  const slug = String(options.data.slug || "").trim();
+  if (!title || !slug) {
+    return { ok: false, error: "Article missing title/slug" };
+  }
+
+  const result = await postArticleToFacebookPage({
+    title,
+    excerpt: String(options.data.excerpt || ""),
+    slug,
+    type: options.data.type === "gossip" ? "gossip" : "news",
+    category: String(options.data.category || ""),
+    breaking: Boolean(options.data.breaking),
+  });
+
+  if (!result.ok) {
+    await options.update({
+      facebookPostError: result.error,
+      facebookPostedAt: null,
+      updatedAt: new Date().toISOString(),
+    });
+    return result;
+  }
+
+  const nowIso = new Date().toISOString();
+  await options.update({
+    facebookPostId: result.postId,
+    facebookPostUrl: result.postUrl,
+    facebookPostedAt: nowIso,
+    facebookPostError: null,
+    updatedAt: nowIso,
+  });
+
+  return result;
+}
+

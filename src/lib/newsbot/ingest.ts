@@ -29,6 +29,15 @@ import {
 } from "@/lib/newsbot/category";
 import { shouldSkipNewsForCoverWatermark, shouldClearNethVideoPosterCover } from "@/lib/newsbot/watermark-detect";
 import { hasSinhalaNewsText } from "@/lib/sinhala-script";
+import {
+  isNewsbotFacebookAutoPostEnabled,
+  newsbotFacebookMaxPerRun,
+  postFirestoreArticleToFacebook,
+} from "@/lib/social/facebook";
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export type NewsSource = {
   id: string;
@@ -1437,13 +1446,21 @@ export type IngestResult = {
 export async function runNewsIngest(options?: {
   maxPerSource?: number;
   sources?: NewsSource[];
-}): Promise<{ ok: boolean; results: IngestResult[]; createdIds: string[] }> {
+}): Promise<{
+  ok: boolean;
+  results: IngestResult[];
+  createdIds: string[];
+  facebookPosted: number;
+  facebookSkipped: number;
+  facebookErrors: number;
+}> {
   const db = getAdminDb();
   if (!db) {
     throw new Error(
       "Firebase Admin not configured. Set FIREBASE_SERVICE_ACCOUNT_JSON on Vercel.",
     );
   }
+  const adminDb = db;
 
   const maxPerSource = options?.maxPerSource ?? 8;
   const sources = (options?.sources ?? DEFAULT_NEWS_SOURCES).filter(
@@ -1451,6 +1468,51 @@ export async function runNewsIngest(options?: {
   );
   const results: IngestResult[] = [];
   const createdIds: string[] = [];
+  let facebookPosted = 0;
+  let facebookSkipped = 0;
+  let facebookErrors = 0;
+  const fbEnabled = isNewsbotFacebookAutoPostEnabled();
+  const fbMax = newsbotFacebookMaxPerRun();
+
+  async function maybePostFacebook(
+    articleId: string,
+    data: Record<string, unknown>,
+  ) {
+    if (!fbEnabled) {
+      facebookSkipped += 1;
+      return;
+    }
+    if (facebookPosted >= fbMax) {
+      facebookSkipped += 1;
+      return;
+    }
+    try {
+      const result = await postFirestoreArticleToFacebook({
+        articleId,
+        data,
+        update: async (fields) => {
+          await adminDb.collection("articles").doc(articleId).set(fields, {
+            merge: true,
+          });
+        },
+      });
+      if ("skipped" in result && result.skipped) {
+        facebookSkipped += 1;
+        return;
+      }
+      if (!result.ok) {
+        facebookErrors += 1;
+        console.warn("[newsbot/facebook]", articleId, result.error);
+        return;
+      }
+      facebookPosted += 1;
+      // Soft rate limit — avoid blasting the Page
+      await sleep(1500);
+    } catch (err) {
+      facebookErrors += 1;
+      console.warn("[newsbot/facebook]", articleId, err);
+    }
+  }
 
   const recentSnap = await db
     .collection("articles")
@@ -1706,7 +1768,14 @@ export async function runNewsIngest(options?: {
             updates.updatedAt = new Date().toISOString();
             await existing.ref.update(updates);
             row.backfilled += 1;
-            if ("status" in updates) row.publishedDrafts += 1;
+            if ("status" in updates) {
+              row.publishedDrafts += 1;
+              await maybePostFacebook(existing.id, {
+                ...existingData,
+                ...updates,
+                status: "published",
+              });
+            }
             if ("category" in updates) row.categoriesUpdated += 1;
           }
           row.skipped += 1;
@@ -1766,16 +1835,17 @@ export async function runNewsIngest(options?: {
         usedCoverKeys.add(coverIdentityKey(coverImage));
 
         const now = new Date().toISOString();
-        const ref = await db.collection("articles").add({
-          type: "news",
+        const slug = slugify(title);
+        const payload = {
+          type: "news" as const,
           title,
-          slug: slugify(title),
+          slug,
           excerpt,
           body: toPlainText(body),
           category,
           coverImage,
           author: "FM Heart",
-          status: "published",
+          status: "published" as const,
           tags: [src.name, category],
           readingTimeMin: readingTime(body),
           views: 0,
@@ -1787,12 +1857,14 @@ export async function runNewsIngest(options?: {
           source: src.name,
           sourceUrl: item.sourceUrl,
           sourceHash: hash,
-          ingestedBy: "newsbot",
-        });
+          ingestedBy: "newsbot" as const,
+        };
+        const ref = await db.collection("articles").add(payload);
 
         createdIds.push(ref.id);
         recentTitles.unshift(needle);
         row.created += 1;
+        await maybePostFacebook(ref.id, payload);
       }
     } catch (err) {
       row.error = err instanceof Error ? err.message : String(err);
@@ -1925,7 +1997,14 @@ export async function runNewsIngest(options?: {
     });
   }
 
-  return { ok: true, results, createdIds };
+  return {
+    ok: true,
+    results,
+    createdIds,
+    facebookPosted,
+    facebookSkipped,
+    facebookErrors,
+  };
 }
 
 async function coverUrlLooksReachable(url: string): Promise<boolean> {
