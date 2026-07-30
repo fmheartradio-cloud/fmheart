@@ -374,12 +374,28 @@ function capBody(text: string): string {
   return (lastBreak > MAX_BODY_CHARS * 0.6 ? slice.slice(0, lastBreak) : slice).trim();
 }
 
+/** Lankadeepa-style reporter line: "(පාලිත ආරියවංශ)" as its own paragraph. */
+function isReporterByline(text: string): boolean {
+  const t = text.trim();
+  if (!/^\([^)\n]{2,80}\)$/u.test(t)) return false;
+  const inner = t.slice(1, -1).trim();
+  if (!inner) return false;
+  // Real sentences in parens are longer / punctuated differently
+  if (/[.!?…]/.test(inner) && inner.length > 45) return false;
+  if (inner.split(/\s+/).filter(Boolean).length > 8) return false;
+  return true;
+}
+
 /** Remove in-body source attribution; source/sourceUrl fields store provenance. */
 function stripSourceAttribution(body: string): string {
   let text = body.trim();
   text = text.replace(
     /^\([\s\S]*?(?:ලංකා\s*ඊ\s*නිව්ස්|Lanka\s*e\s*News|LEN)[\s\S]*?\)\s*/iu,
     "",
+  );
+  // Lankadeepa / similar: leading "(Reporter Name)" byline
+  text = text.replace(/^\(([^)\n]{2,80})\)\s*/u, (full, inner) =>
+    isReporterByline(`(${inner})`) ? "" : full,
   );
   text = text.replace(/\n*(?:මූලාශ්‍ර|මුලාශ්‍ර|Source\s*:)[^\n]*/giu, "");
   return stripSyndicationFooter(text);
@@ -432,7 +448,11 @@ function htmlFragmentToParagraphs(fragment: string): string {
     if (/\breco-body\b/i.test(tag)) continue;
     if (/\badsbyvli\b/i.test(match[1])) continue;
     const text = stripInlineHtml(match[1]);
-    if (text.length >= 20 && !/^Reply To:/i.test(text)) {
+    if (
+      text.length >= 20 &&
+      !/^Reply To:/i.test(text) &&
+      !isReporterByline(text)
+    ) {
       paragraphs.push(text);
     }
   }
