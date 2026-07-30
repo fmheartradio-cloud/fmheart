@@ -159,21 +159,15 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     if (!el) return;
     try {
       el.pause();
-      el.removeAttribute("src");
-      el.load();
+      // Keep src so next play can resume without a cold proxy reconnect
     } catch {
       /* ignore */
     }
   }, []);
 
-  const ensureSpectrumTap = useCallback(async () => {
-    if (appleRef.current) return;
-    // Main path already wired MediaElementSource (proxy fallback playback)
-    if (gainRef.current) {
-      setSpectrumMode("realtime");
-      return;
-    }
-
+  /** Build AudioContext + Analyser + MediaElementSource early (no network yet). */
+  const warmSpectrumGraph = useCallback(async () => {
+    if (appleRef.current || gainRef.current) return;
     const spectrum = spectrumAudioRef.current;
     if (!spectrum) return;
 
@@ -185,9 +179,6 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       ctxRef.current = new Ctx();
     }
     const ctx = ctxRef.current;
-    if (ctx.state === "suspended") {
-      await ctx.resume();
-    }
 
     if (!analyserRef.current) {
       const analyserNode = ctx.createAnalyser();
@@ -212,16 +203,46 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         console.warn("[radio] spectrum MediaElementSource failed:", err);
         setSpectrumMode("simulated");
-        return;
       }
+    }
+  }, []);
+
+  const ensureSpectrumTap = useCallback(async () => {
+    if (appleRef.current) return;
+    if (gainRef.current) {
+      setSpectrumMode("realtime");
+      return;
+    }
+
+    const spectrum = spectrumAudioRef.current;
+    if (!spectrum) return;
+
+    await warmSpectrumGraph();
+    const ctx = ctxRef.current;
+    if (!ctx || !analyserRef.current || !spectrumGraphReadyRef.current) {
+      setSpectrumMode("simulated");
+      return;
+    }
+    if (ctx.state === "suspended") {
+      await ctx.resume();
     }
 
     // Never mute — muted MediaElementSource output is all zeros in Chromium
     spectrum.muted = false;
     spectrum.volume = 1;
-    spectrum.src = withCacheBust(PROXY_STREAM);
+    // Only reassign src when needed — reuse buffer on quick pause/play
+    const needNewSrc =
+      !spectrum.src ||
+      spectrum.paused ||
+      spectrum.error != null ||
+      spectrum.readyState < 2;
+    if (needNewSrc) {
+      spectrum.src = withCacheBust(PROXY_STREAM);
+    }
     try {
       await spectrum.play();
+      // Show realtime immediately — don't wait for verify delay
+      setSpectrumMode("realtime");
     } catch (err) {
       console.warn("[radio] spectrum tap play failed:", err);
       setSpectrumMode("simulated");
@@ -229,6 +250,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     }
 
     const verify = (attempt: number) => {
+      spectrumReconnectTimer.current = null;
       if (!wantPlayRef.current || appleRef.current) return;
       const an = analyserRef.current;
       if (!an) return;
@@ -240,25 +262,35 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         setSpectrumMode("realtime");
         return;
       }
-      if (attempt < 2 && spectrumAudioRef.current) {
-        spectrumAudioRef.current.src = withCacheBust(PROXY_STREAM);
-        void spectrumAudioRef.current.play().then(() => {
-          spectrumReconnectTimer.current = window.setTimeout(
-            () => verify(attempt + 1),
-            1800,
-          );
-        }).catch(() => setSpectrumMode("simulated"));
+      if (attempt < 3) {
+        spectrumReconnectTimer.current = window.setTimeout(
+          () => verify(attempt + 1),
+          350,
+        );
         return;
       }
-      // Keep UI alive with simulated motion if proxy FFT stays silent
+      if (attempt === 3 && spectrumAudioRef.current) {
+        spectrumAudioRef.current.src = withCacheBust(PROXY_STREAM);
+        void spectrumAudioRef.current
+          .play()
+          .then(() => {
+            spectrumReconnectTimer.current = window.setTimeout(
+              () => verify(4),
+              400,
+            );
+          })
+          .catch(() => setSpectrumMode("simulated"));
+        return;
+      }
       setSpectrumMode("simulated");
     };
 
     if (spectrumReconnectTimer.current != null) {
       window.clearTimeout(spectrumReconnectTimer.current);
     }
-    spectrumReconnectTimer.current = window.setTimeout(() => verify(0), 1200);
-  }, []);
+    // First energy check quickly — proxy usually has bytes within ~300ms
+    spectrumReconnectTimer.current = window.setTimeout(() => verify(0), 280);
+  }, [warmSpectrumGraph]);
 
   /** Legacy: when direct Icecast fails, play via proxy + Web Audio graph. */
   const ensureGraph = useCallback(async () => {
@@ -423,6 +455,10 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     appleRef.current = isAppleWebKitPlayback();
     setSpectrumMode(appleRef.current ? "simulated" : "realtime");
+    // Pre-build Web Audio graph so first Play only needs to open the proxy
+    if (!appleRef.current) {
+      void warmSpectrumGraph();
+    }
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -537,7 +573,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       spectrumReconnectTimer.current = window.setTimeout(() => {
         spectrumReconnectTimer.current = null;
         if (wantPlayRef.current) void ensureSpectrumTapRef.current();
-      }, 1200);
+      }, 400);
     };
     if (spectrum) {
       spectrum.addEventListener("error", onSpectrumDrop);
@@ -567,7 +603,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
     };
-  }, [clearReconnect, clearWaitingWatch]);
+  }, [clearReconnect, clearWaitingWatch, warmSpectrumGraph]);
 
   // True unmount cleanup only
   useEffect(() => {
@@ -680,10 +716,8 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         assignStream(audio, SITE.streamUrl, "direct");
         await audio.play();
       } else {
-        // Direct Icecast first — avoids Vercel proxy ~5 min cutoff
-        await startStream(false);
-        // Start FFT tap in the same user-gesture turn (autoplay-safe)
-        void ensureSpectrumTap();
+        // Start FFT proxy + audible stream together (cuts ~1–2s off spectrum delay)
+        await Promise.all([startStream(false), ensureSpectrumTap()]);
       }
     } catch (err) {
       try {
