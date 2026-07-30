@@ -51,7 +51,13 @@ export function buildFacebookMessage(input: FacebookPostInput): string {
   const lines: string[] = [];
   if (input.breaking) lines.push("🚨 BREAKING NEWS", "");
   lines.push(title);
-  lines.push("", "👉 වැඩි විස්තර:", url, "", "#FMHeart #SriLanka");
+  lines.push(
+    "",
+    "👉 වැඩි විස්තර:",
+    url,
+    "",
+    "#FMHeartNews24 #FMHeart #SriLanka",
+  );
   return lines.join("\n");
 }
 
@@ -156,7 +162,7 @@ export async function postArticleToFacebookPage(
   const url = articlePublicUrl(input);
   const shortTitle = input.title.trim().slice(0, 120);
   return graphPost(`${encodeURIComponent(pageId)}/feed`, token, {
-    message: `${shortTitle}\n\n${url}\n\n#FMHeart`,
+    message: `${shortTitle}\n\n${url}\n\n#FMHeartNews24 #FMHeart #SriLanka`,
   });
 }
 
