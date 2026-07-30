@@ -79,6 +79,34 @@ export const DEFAULT_NEWS_SOURCES: NewsSource[] = [
     category: "දේශීය",
     active: true,
   },
+  {
+    id: "citizen",
+    name: "Citizen",
+    rss: "https://www.citizen.lk/feed/",
+    category: "දේශීය",
+    active: true,
+  },
+  {
+    id: "lankacnews",
+    name: "Lanka C News",
+    rss: "https://www.lankacnews.com/feeds/posts/default?alt=rss",
+    category: "දේශීය",
+    active: true,
+  },
+  {
+    id: "lankadeepa",
+    name: "Lankadeepa",
+    rss: "https://www.lankadeepa.lk/rss/latest_news/1",
+    category: "දේශීය",
+    active: true,
+  },
+  {
+    id: "divaina",
+    name: "Divaina",
+    rss: "https://www.divaina.lk/feed/",
+    category: "දේශීය",
+    active: true,
+  },
 ];
 
 type FeedItem = {
