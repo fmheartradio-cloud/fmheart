@@ -128,12 +128,20 @@ export function isLikelyJunkCoverUrl(url: string): boolean {
     ) {
       return true;
     }
+    // Lankadeepa site chrome / ads / default share card (same og:image on every story)
+    if (/lankadeepa\.lk/i.test(u.hostname) || /cdn\.lankadeepa\.lk/i.test(u.hostname)) {
+      if (/\/images\/ads\//i.test(path)) return true;
+      if (/\/assets\/\d{4}\/images\/logo/i.test(path)) return true;
+      if (/\/logo\.(jpe?g|png|webp|gif)$/i.test(path)) return true;
+      // Site-wide default OG / brand mark reused on every article
+      if (/image_8df7de9e07\.png$/i.test(last)) return true;
+    }
   } catch {
     if (/adaderanasinhala\/?\s*$/i.test(url)) return true;
     if (/\/wp-content\/uploads\/\d{4}\/\d{2}\/?$/i.test(url)) return true;
   }
   if (isLikelyVideoThumbnailUrl(url)) return true;
-  return /logo|icon|avatar|pixel|spacer|1x1|tracking|badge|sprite|advertising\.gif|brand\.jpg|gel\/brand|pix\.png|lanka-e-news-log|new-year-\d{4}/i.test(
+  return /logo|icon|avatar|pixel|spacer|1x1|tracking|badge|sprite|advertising\.gif|brand\.jpg|gel\/brand|pix\.png|lanka-e-news-log|new-year-\d{4}|image_8df7de9e07\.png|\/images\/ads\//i.test(
     url,
   );
 }

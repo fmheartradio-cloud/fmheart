@@ -10,6 +10,7 @@ import {
 } from "@/lib/html-entities";
 import {
   finalizeCoverUrl,
+  isLikelyJunkCoverUrl,
   needsHigherQualityCover,
   pickBestCoverUrl,
   upgradeImageUrl,
@@ -720,7 +721,7 @@ type ArticlePageData = {
 };
 
 const JUNK_IMAGE_RE =
-  /logo|icon|avatar|pixel|spacer|1x1|tracking|badge|sprite|facebook|instagram|youtube|twitter|instagrame|advertising\.gif|lankahotnews\+advertising|pix\.png|lanka-e-news-log|new-year-\d{4}|outbrainimg/i;
+  /logo|icon|avatar|pixel|spacer|1x1|tracking|badge|sprite|facebook|instagram|youtube|twitter|instagrame|advertising\.gif|lankahotnews\+advertising|pix\.png|lanka-e-news-log|new-year-\d{4}|outbrainimg|image_8df7de9e07\.png|\/images\/ads\//i;
 
 const RELATED_SECTION_RE =
   /<(?:div|section|aside)[^>]+class=["'][^"']*\b(?:related|outbrain|reco|popular-posts|popular-news|more-news|you-may|td-related|jp-relatedposts|sidebar)\b/i;
@@ -959,6 +960,35 @@ function isNethHost(url: string): boolean {
   return hostOf(url).includes("nethnews.lk");
 }
 
+function isLankadeepaHost(url: string): boolean {
+  return hostOf(url).includes("lankadeepa.lk");
+}
+
+/**
+ * Lankadeepa hero is the first image inside `.article-body` (og:image is a
+ * site-wide logo / default share card on every story).
+ */
+function extractLankadeepaCoverImage(html: string, pageUrl: string): string {
+  const body =
+    html.match(
+      /<div[^>]+class=["'][^"']*\barticle-body\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+    )?.[1] || "";
+  if (!body) return "";
+
+  for (const match of body.matchAll(/<img[^>]+>/gi)) {
+    const tag = match[0];
+    const src =
+      tag.match(/\bsrc=["']([^"']+)["']/i)?.[1] ||
+      tag.match(/\bdata-src=["']([^"']+)["']/i)?.[1];
+    if (!src || isJunkImageUrl(src) || isLikelyVideoThumbnailUrl(src)) continue;
+    const abs = normalizeCoverUrl(
+      absolutizeUrl(decodeHtmlEntities(src), pageUrl),
+    );
+    if (abs && isImageUrl(abs) && !isLikelyJunkCoverUrl(abs)) return abs;
+  }
+  return "";
+}
+
 /**
  * sinhala.adaderana.lk hero lives in `.news-banner` (often a real `_L` file
  * with a different id than og:image `_M`).
@@ -1100,6 +1130,11 @@ function resolveCoverImage(
     return og || rss || page;
   }
 
+  if (isLankadeepaHost(pageUrl)) {
+    // og:image is a site-wide default brand card — never use it as the cover.
+    return pickBestCoverUrl(rss, page) || rss || page;
+  }
+
   // og:image share cards are usually the highest quality for our sources.
   const best = pickBestCoverUrl(og, page, rss);
   if (best) return best;
@@ -1176,7 +1211,7 @@ function collectContentImageCandidates(
   const containers = [
     /<article[^>]*>([\s\S]*?)<\/article>/i,
     /<div[^>]+itemprop=["']articleBody["'][^>]*>([\s\S]*?)<\/div>/i,
-    /<div[^>]+class=["'][^"']*\b(?:entry-content|article-content|post-content|story-content|single-body-wrap|news-content|prose)\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+    /<div[^>]+class=["'][^"']*\b(?:entry-content|article-content|post-content|story-content|single-body-wrap|news-content|prose|article-body)\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
   ];
   const candidates: string[] = [];
   const seen = new Set<string>();
@@ -1239,6 +1274,13 @@ function extractImageFromPageHtml(
     // Keep content image separate from og — resolveCoverImage prefers og, and
     // pickSanitizedCover can fall back to content when og is a video poster.
     return extractContentImageFromHtml(html, pageUrl);
+  }
+
+  if (isLankadeepaHost(pageUrl)) {
+    return (
+      extractLankadeepaCoverImage(html, pageUrl) ||
+      extractContentImageFromHtml(html, pageUrl)
+    );
   }
 
   const og = ogCoverImage || extractOgImageFromHtml(html, pageUrl);
