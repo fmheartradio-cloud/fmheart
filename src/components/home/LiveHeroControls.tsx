@@ -3,13 +3,14 @@
 import { useRadio } from "@/context/RadioProvider";
 
 export function LiveHeroControls() {
-  const { isPlaying, isLoading, toggle, volume, setVolume, error, meta } =
+  const { isPlaying, isLoading, toggle, primeSpectrum, volume, setVolume, error, meta } =
     useRadio();
 
   return (
     <div className="mt-8 space-y-4">
       <button
         type="button"
+        onPointerDown={() => primeSpectrum()}
         onClick={() => void toggle()}
         className="inline-flex items-center gap-3 rounded-full bg-fh-red px-7 py-3.5 font-heading text-lg font-extrabold text-white transition hover:bg-fh-red-dark"
       >

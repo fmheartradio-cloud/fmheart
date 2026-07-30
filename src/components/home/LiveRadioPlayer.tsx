@@ -13,6 +13,7 @@ export function LiveRadioPlayer() {
     meta,
     recent,
     toggle,
+    primeSpectrum,
     volume,
     setVolume,
   } = useRadio();
@@ -39,6 +40,7 @@ export function LiveRadioPlayer() {
         <div className="flex items-center gap-4">
           <button
             type="button"
+            onPointerDown={() => primeSpectrum()}
             onClick={() => void toggle()}
             disabled={isLoading}
             className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-fh-red-bright to-fh-red-dark text-2xl shadow-lg shadow-fh-red/30 transition hover:scale-105 disabled:opacity-70"

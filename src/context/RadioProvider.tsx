@@ -38,6 +38,8 @@ type RadioContextValue = {
   play: () => Promise<void>;
   pause: () => void;
   toggle: () => Promise<void>;
+  /** Call on play-button pointerdown to start FFT proxy before click. */
+  primeSpectrum: () => void;
   setVolume: (v: number) => void;
 };
 
@@ -207,6 +209,36 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /** Wake Vercel proxy + begin buffering before the user hits Play. */
+  const prefetchSpectrumProxy = useCallback(() => {
+    if (appleRef.current) return;
+    const spectrum = spectrumAudioRef.current;
+    if (!spectrum) return;
+
+    // Warm serverless isolate (discard body quickly)
+    void fetch(`${PROXY_STREAM}?warm=${Date.now()}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
+    })
+      .then(async (res) => {
+        await res.body?.cancel().catch(() => undefined);
+      })
+      .catch(() => undefined);
+
+    // Start media buffer without playing (same-origin)
+    if (!spectrum.currentSrc && !spectrum.getAttribute("src")) {
+      spectrum.preload = "auto";
+      spectrum.muted = false;
+      spectrum.volume = 1;
+      spectrum.src = withCacheBust(PROXY_STREAM);
+      try {
+        spectrum.load();
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
+
   const ensureSpectrumTap = useCallback(async () => {
     if (appleRef.current) return;
     if (gainRef.current) {
@@ -227,26 +259,35 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       await ctx.resume();
     }
 
-    // Never mute — muted MediaElementSource output is all zeros in Chromium
     spectrum.muted = false;
     spectrum.volume = 1;
-    // Only reassign src when needed — reuse buffer on quick pause/play
-    const needNewSrc =
-      !spectrum.src ||
-      spectrum.paused ||
+
+    // Do NOT treat paused as "need new src" — that forced a 2–3s cold reload every Play
+    const hasSrc = Boolean(spectrum.currentSrc || spectrum.getAttribute("src"));
+    const dead =
       spectrum.error != null ||
-      spectrum.readyState < 2;
-    if (needNewSrc) {
+      spectrum.networkState === HTMLMediaElement.NETWORK_NO_SOURCE;
+    if (!hasSrc || dead) {
       spectrum.src = withCacheBust(PROXY_STREAM);
     }
+
     try {
-      await spectrum.play();
-      // Show realtime immediately — don't wait for verify delay
+      // Don't block Play UX on proxy buffer — fire play and flip mode ASAP
+      const playP = spectrum.play();
       setSpectrumMode("realtime");
+      await playP;
     } catch (err) {
       console.warn("[radio] spectrum tap play failed:", err);
-      setSpectrumMode("simulated");
-      return;
+      // One cold retry
+      try {
+        spectrum.src = withCacheBust(PROXY_STREAM);
+        await spectrum.play();
+        setSpectrumMode("realtime");
+      } catch (err2) {
+        console.warn("[radio] spectrum tap retry failed:", err2);
+        setSpectrumMode("simulated");
+        return;
+      }
     }
 
     const verify = (attempt: number) => {
@@ -262,21 +303,21 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         setSpectrumMode("realtime");
         return;
       }
-      if (attempt < 3) {
+      if (attempt < 4) {
         spectrumReconnectTimer.current = window.setTimeout(
           () => verify(attempt + 1),
-          350,
+          250,
         );
         return;
       }
-      if (attempt === 3 && spectrumAudioRef.current) {
+      if (attempt === 4 && spectrumAudioRef.current) {
         spectrumAudioRef.current.src = withCacheBust(PROXY_STREAM);
         void spectrumAudioRef.current
           .play()
           .then(() => {
             spectrumReconnectTimer.current = window.setTimeout(
-              () => verify(4),
-              400,
+              () => verify(5),
+              300,
             );
           })
           .catch(() => setSpectrumMode("simulated"));
@@ -288,9 +329,17 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     if (spectrumReconnectTimer.current != null) {
       window.clearTimeout(spectrumReconnectTimer.current);
     }
-    // First energy check quickly — proxy usually has bytes within ~300ms
-    spectrumReconnectTimer.current = window.setTimeout(() => verify(0), 280);
+    spectrumReconnectTimer.current = window.setTimeout(() => verify(0), 200);
   }, [warmSpectrumGraph]);
+
+  /** pointerdown on Play — starts FFT proxy in the same gesture, before click. */
+  const primeSpectrum = useCallback(() => {
+    if (appleRef.current || wantPlayRef.current) return;
+    void warmSpectrumGraph().then(() => {
+      void ctxRef.current?.resume();
+      void ensureSpectrumTap();
+    });
+  }, [ensureSpectrumTap, warmSpectrumGraph]);
 
   /** Legacy: when direct Icecast fails, play via proxy + Web Audio graph. */
   const ensureGraph = useCallback(async () => {
@@ -455,9 +504,9 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     appleRef.current = isAppleWebKitPlayback();
     setSpectrumMode(appleRef.current ? "simulated" : "realtime");
-    // Pre-build Web Audio graph so first Play only needs to open the proxy
+    // Pre-build Web Audio graph + warm Vercel proxy so Play isn't a cold start
     if (!appleRef.current) {
-      void warmSpectrumGraph();
+      void warmSpectrumGraph().then(() => prefetchSpectrumProxy());
     }
     const audio = audioRef.current;
     if (!audio) return;
@@ -603,7 +652,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
     };
-  }, [clearReconnect, clearWaitingWatch, warmSpectrumGraph]);
+  }, [clearReconnect, clearWaitingWatch, prefetchSpectrumProxy, warmSpectrumGraph]);
 
   // True unmount cleanup only
   useEffect(() => {
@@ -716,8 +765,9 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         assignStream(audio, SITE.streamUrl, "direct");
         await audio.play();
       } else {
-        // Start FFT proxy + audible stream together (cuts ~1–2s off spectrum delay)
-        await Promise.all([startStream(false), ensureSpectrumTap()]);
+        // FFT tap must not block audible play — start both, only await main stream
+        void ensureSpectrumTap();
+        await startStream(false);
       }
     } catch (err) {
       try {
@@ -788,6 +838,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       play,
       pause,
       toggle,
+      primeSpectrum,
       setVolume,
     }),
     [
@@ -802,6 +853,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       play,
       pause,
       toggle,
+      primeSpectrum,
       setVolume,
     ],
   );
