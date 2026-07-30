@@ -145,7 +145,9 @@ export function RadioProvider({ children }: { children: ReactNode }) {
 
   /**
    * Real FFT on non-Apple: audible playback stays on direct Icecast (no CORS).
-   * A muted same-origin /api/radio-stream element feeds MediaElementSource → Analyser.
+   * A second same-origin /api/radio-stream element feeds MediaElementSource → Analyser.
+   * Must NOT mute that element — muted media yields silent FFT in Chromium.
+   * Route analyser → gain(0) → destination so the graph stays active without double audio.
    * Proxy may drop ~5 min — reconnect spectrum tap only; main audio keeps playing.
    */
   const stopSpectrumTap = useCallback(() => {
@@ -190,9 +192,9 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     if (!analyserRef.current) {
       const analyserNode = ctx.createAnalyser();
       analyserNode.fftSize = 2048;
-      analyserNode.smoothingTimeConstant = 0.5;
-      analyserNode.minDecibels = -95;
-      analyserNode.maxDecibels = -28;
+      analyserNode.smoothingTimeConstant = 0.45;
+      analyserNode.minDecibels = -100;
+      analyserNode.maxDecibels = -30;
       analyserRef.current = analyserNode;
       setAnalyser(analyserNode);
     }
@@ -200,8 +202,11 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     if (!spectrumGraphReadyRef.current) {
       try {
         const source = ctx.createMediaElementSource(spectrum);
-        // Analyse only — speakers use the main <audio> element
+        const silent = ctx.createGain();
+        silent.gain.value = 0;
         source.connect(analyserRef.current);
+        analyserRef.current.connect(silent);
+        silent.connect(ctx.destination);
         sourceRef.current = source;
         spectrumGraphReadyRef.current = true;
       } catch (err) {
@@ -211,24 +216,19 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    spectrum.muted = true;
-    spectrum.volume = 0;
+    // Never mute — muted MediaElementSource output is all zeros in Chromium
+    spectrum.muted = false;
+    spectrum.volume = 1;
     spectrum.src = withCacheBust(PROXY_STREAM);
     try {
       await spectrum.play();
-      setSpectrumMode("realtime");
     } catch (err) {
       console.warn("[radio] spectrum tap play failed:", err);
       setSpectrumMode("simulated");
       return;
     }
 
-    // Soft-verify FFT energy; retry tap once if silent
-    if (spectrumReconnectTimer.current != null) {
-      window.clearTimeout(spectrumReconnectTimer.current);
-    }
-    spectrumReconnectTimer.current = window.setTimeout(() => {
-      spectrumReconnectTimer.current = null;
+    const verify = (attempt: number) => {
       if (!wantPlayRef.current || appleRef.current) return;
       const an = analyserRef.current;
       if (!an) return;
@@ -240,14 +240,24 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         setSpectrumMode("realtime");
         return;
       }
-      // Reload proxy once
-      if (spectrumAudioRef.current && wantPlayRef.current) {
+      if (attempt < 2 && spectrumAudioRef.current) {
         spectrumAudioRef.current.src = withCacheBust(PROXY_STREAM);
-        void spectrumAudioRef.current.play().catch(() => {
-          setSpectrumMode("simulated");
-        });
+        void spectrumAudioRef.current.play().then(() => {
+          spectrumReconnectTimer.current = window.setTimeout(
+            () => verify(attempt + 1),
+            1800,
+          );
+        }).catch(() => setSpectrumMode("simulated"));
+        return;
       }
-    }, 2000);
+      // Keep UI alive with simulated motion if proxy FFT stays silent
+      setSpectrumMode("simulated");
+    };
+
+    if (spectrumReconnectTimer.current != null) {
+      window.clearTimeout(spectrumReconnectTimer.current);
+    }
+    spectrumReconnectTimer.current = window.setTimeout(() => verify(0), 1200);
   }, []);
 
   /** Legacy: when direct Icecast fails, play via proxy + Web Audio graph. */
@@ -672,6 +682,8 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       } else {
         // Direct Icecast first — avoids Vercel proxy ~5 min cutoff
         await startStream(false);
+        // Start FFT tap in the same user-gesture turn (autoplay-safe)
+        void ensureSpectrumTap();
       }
     } catch (err) {
       try {
@@ -699,7 +711,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         void err;
       }
     }
-  }, [assignStream, clearReconnect, clearWaitingWatch, startStream]);
+  }, [assignStream, clearReconnect, clearWaitingWatch, ensureSpectrumTap, startStream]);
 
   const pause = useCallback(() => {
     const audio = audioRef.current;
@@ -769,11 +781,10 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         className="pointer-events-none fixed top-0 left-0 h-px w-px opacity-0"
         aria-hidden
       />
-      {/* Muted same-origin proxy feed for real FFT (non-Apple). */}
+      {/* Same-origin proxy feed for real FFT (non-Apple). Not muted — mute zeros FFT. */}
       <audio
         ref={spectrumAudioRef}
         preload="none"
-        muted
         playsInline
         crossOrigin="anonymous"
         className="pointer-events-none fixed top-0 left-0 h-px w-px opacity-0"

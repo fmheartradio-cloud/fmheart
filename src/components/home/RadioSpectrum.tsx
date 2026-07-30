@@ -149,11 +149,10 @@ export function RadioSpectrum({ className }: Props) {
           targets[i]! = Math.min(1, targets[i]! * volScale);
         }
 
-        // Quiet moments: keep real (near-zero) bars — do not fake simulate
+        // Quiet / no FFT yet: animate simulated bars instead of a dead flat line
         if (!hasSignal) {
-          for (let i = 0; i < targets.length; i++) {
-            targets[i] = Math.max(targets[i]!, 0.02);
-          }
+          fillSimulatedBars(targets, now, volume, active);
+          hasSignal = active;
         }
       } else {
         // Apple / no analyser: keep the existing simulated look
