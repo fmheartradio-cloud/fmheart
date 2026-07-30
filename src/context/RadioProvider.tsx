@@ -192,9 +192,9 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     if (!analyserRef.current) {
       const analyserNode = ctx.createAnalyser();
       analyserNode.fftSize = 2048;
-      analyserNode.smoothingTimeConstant = 0.45;
-      analyserNode.minDecibels = -100;
-      analyserNode.maxDecibels = -30;
+      analyserNode.smoothingTimeConstant = 0.72;
+      analyserNode.minDecibels = -82;
+      analyserNode.maxDecibels = -28;
       analyserRef.current = analyserNode;
       setAnalyser(analyserNode);
     }
@@ -273,8 +273,8 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       const ctx = new Ctx();
       const analyserNode = ctx.createAnalyser();
       analyserNode.fftSize = 2048;
-      analyserNode.smoothingTimeConstant = 0.5;
-      analyserNode.minDecibels = -95;
+      analyserNode.smoothingTimeConstant = 0.72;
+      analyserNode.minDecibels = -82;
       analyserNode.maxDecibels = -28;
 
       const gain = ctx.createGain();

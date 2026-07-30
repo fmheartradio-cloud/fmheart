@@ -9,7 +9,11 @@ type Props = {
 
 const BAR_COUNT = 48;
 
-/** Map analyser FFT bins onto log-spaced display bars (0..1). */
+/**
+ * Map analyser FFT bins onto log-spaced display bars (0..1).
+ * Peak-normalizes each frame so bass/mid/treble shape stays visible
+ * instead of clipping into a flat ceiling on loud streams.
+ */
 function fillLogBars(
   freq: Uint8Array<ArrayBuffer>,
   sampleRate: number,
@@ -17,8 +21,9 @@ function fillLogBars(
 ) {
   const binCount = freq.length;
   const nyquist = sampleRate / 2;
-  const minHz = 30;
-  const maxHz = Math.min(16_000, nyquist);
+  const minHz = 40;
+  const maxHz = Math.min(14_000, nyquist);
+  let peak = 0;
 
   for (let i = 0; i < out.length; i++) {
     const t0 = i / out.length;
@@ -28,15 +33,35 @@ function fillLogBars(
     const b0 = Math.max(0, Math.floor((f0 / nyquist) * binCount));
     const b1 = Math.min(binCount - 1, Math.ceil((f1 / nyquist) * binCount));
 
+    let max = 0;
     let sum = 0;
     let n = 0;
     for (let b = b0; b <= b1; b++) {
-      sum += freq[b]!;
+      const v = freq[b]!;
+      max = Math.max(max, v);
+      sum += v;
       n++;
     }
-    const avg = n > 0 ? sum / n / 255 : 0;
-    // Boost mid/bass response so quiet Icecast streams still move bars
-    out[i] = Math.min(1, Math.pow(Math.max(0, avg), 0.65) * 1.75);
+    // Blend max + average so single bins don't spike, but shape stays sharp
+    const avg = n > 0 ? sum / n : 0;
+    const mixed = (max * 0.65 + avg * 0.35) / 255;
+    // Mild tilt: bass a bit taller, highs a bit softer (typical EQ look)
+    const x = out.length <= 1 ? 0 : i / (out.length - 1);
+    const tilt = 1.08 - 0.28 * x;
+    out[i] = mixed * tilt;
+    peak = Math.max(peak, out[i]!);
+  }
+
+  if (peak < 0.02) {
+    for (let i = 0; i < out.length; i++) out[i] = 0;
+    return;
+  }
+
+  // Relative normalize — keeps mid/high valleys visible on loud Icecast
+  const scale = peak > 0.55 ? 0.88 / peak : 1.05;
+  for (let i = 0; i < out.length; i++) {
+    const v = Math.max(0, out[i]! * scale);
+    out[i] = Math.min(0.98, Math.pow(v, 1.05) * 0.92 + 0.02);
   }
 }
 
@@ -140,17 +165,24 @@ export function RadioSpectrum({ className }: Props) {
         fillLogBars(freqRef.current, analyser.context.sampleRate, targets);
 
         let energy = 0;
+        let variance = 0;
         for (let i = 0; i < targets.length; i++) energy += targets[i]!;
         energy /= targets.length;
-        hasSignal = energy > 0.008;
-
-        const volScale = 0.85 + Math.min(1, volume) * 0.35;
         for (let i = 0; i < targets.length; i++) {
-          targets[i]! = Math.min(1, targets[i]! * volScale);
+          const d = targets[i]! - energy;
+          variance += d * d;
+        }
+        variance /= targets.length;
+        hasSignal = energy > 0.04;
+
+        // Soft volume influence — never push a flat wall of max bars
+        const volScale = 0.82 + Math.min(1, volume) * 0.18;
+        for (let i = 0; i < targets.length; i++) {
+          targets[i]! = Math.min(0.98, targets[i]! * volScale);
         }
 
-        // Quiet / no FFT yet: animate simulated bars instead of a dead flat line
-        if (!hasSignal) {
+        // Silent FFT or no shape: fall back to simulated motion
+        if (!hasSignal || (energy > 0.75 && variance < 0.0008)) {
           fillSimulatedBars(targets, now, volume, active);
           hasSignal = active;
         }
@@ -161,9 +193,9 @@ export function RadioSpectrum({ className }: Props) {
       }
 
       const lively = active && (hasSignal || isPlaying || !useRealtime);
-      const attack = lively ? 0.32 : 0.08;
-      const release = lively ? 0.18 : 0.07;
-      const peakFall = lively ? 0.6 : 0.35;
+      const attack = lively ? 0.42 : 0.08;
+      const release = lively ? 0.22 : 0.07;
+      const peakFall = lively ? 0.85 : 0.35;
 
       for (let i = 0; i < BAR_COUNT; i++) {
         const target = Math.min(1, targets[i]!);
