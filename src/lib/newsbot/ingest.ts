@@ -95,13 +95,6 @@ export const DEFAULT_NEWS_SOURCES: NewsSource[] = [
     active: true,
   },
   {
-    id: "lankadeepa",
-    name: "Lankadeepa",
-    rss: "https://www.lankadeepa.lk/rss/latest_news/1",
-    category: "දේශීය",
-    active: true,
-  },
-  {
     id: "divaina",
     name: "Divaina",
     rss: "https://www.divaina.lk/feed/",
