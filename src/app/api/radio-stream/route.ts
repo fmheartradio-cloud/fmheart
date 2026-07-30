@@ -33,6 +33,7 @@ export async function GET() {
         "Content-Type": contentType,
         "Cache-Control": "no-store, no-cache, must-revalidate",
         "Transfer-Encoding": "chunked",
+        "Access-Control-Allow-Origin": "*",
       },
     });
   } catch {

@@ -35,8 +35,8 @@ function fillLogBars(
       n++;
     }
     const avg = n > 0 ? sum / n / 255 : 0;
-    // Slight boost so quiet streams still read clearly
-    out[i] = Math.min(1, Math.pow(avg, 0.85) * 1.35);
+    // Boost mid/bass response so quiet Icecast streams still move bars
+    out[i] = Math.min(1, Math.pow(Math.max(0, avg), 0.65) * 1.75);
   }
 }
 
