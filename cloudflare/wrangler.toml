@@ -1,6 +1,9 @@
 name = "fmheart-radio-proxy"
 main = "radio-stream-worker.js"
 compatibility_date = "2024-11-01"
+workers_dev = true
 
-# Free plan works for light traffic; Paid ($5/mo) recommended for many concurrent listeners.
-# Cloudflare does not charge egress bandwidth.
+# Serve on the existing fmheart.lk Cloudflare zone (zero egress).
+[[routes]]
+pattern = "stream.fmheart.lk"
+custom_domain = true
