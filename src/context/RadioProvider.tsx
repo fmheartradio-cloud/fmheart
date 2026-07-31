@@ -54,15 +54,29 @@ const DEFAULT_META: RadioMeta = {
 
 const POLL_MS = 15_000;
 const MAX_RECENT = 8;
-const PROXY_STREAM = "/api/radio-stream";
 const STALL_RECONNECT_MS = 12_000;
 const WATCHDOG_MS = 5_000;
 const PROGRESS_STALE_MS = 15_000;
-/** Hand over to the standby proxy element well before Vercel maxDuration (300s). */
-const PROXY_ROTATE_MS = 195_000;
+/** Vercel serverless maxDuration ~300s — rotate earlier. External CF proxy can stay longer. */
+const VERCEL_PROXY_ROTATE_MS = 195_000;
+const EXTERNAL_PROXY_ROTATE_MS = 25 * 60_000;
 const CROSSFADE_S = 0.7;
 /** Resume instantly after a short pause; reload src after a long one. */
 const PROXY_RESUME_GRACE_MS = 45_000;
+
+function streamProxyUrl() {
+  return SITE.streamProxyUrl || "/api/radio-stream";
+}
+
+function isVercelLocalProxy(url: string) {
+  return url.startsWith("/") || /vercel\.app|fmheart\.lk\/api\/radio-stream/i.test(url);
+}
+
+function proxyRotateMs() {
+  return isVercelLocalProxy(streamProxyUrl())
+    ? VERCEL_PROXY_ROTATE_MS
+    : EXTERNAL_PROXY_ROTATE_MS;
+}
 
 /** Safari + all iOS browsers (Chrome/Firefox on iOS are WebKit too). */
 function isAppleWebKitPlayback() {
@@ -192,7 +206,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         const analyserNode = ctx.createAnalyser();
         analyserNode.fftSize = 2048;
         // Low smoothing keeps bars tight to the beat the listener hears
-        analyserNode.smoothingTimeConstant = 0.6;
+        analyserNode.smoothingTimeConstant = 0.68;
         analyserNode.minDecibels = -82;
         analyserNode.maxDecibels = -28;
         analyserRef.current = analyserNode;
@@ -257,7 +271,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         proxyPausedAt.current > 0 &&
         Date.now() - proxyPausedAt.current > PROXY_RESUME_GRACE_MS;
       if (forceNewSrc || !hasSrc || el.error != null || stale) {
-        el.src = withCacheBust(PROXY_STREAM);
+        el.src = withCacheBust(streamProxyUrl());
       }
       await el.play();
     },
@@ -269,7 +283,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     rotateTimer.current = window.setTimeout(() => {
       rotateTimer.current = null;
       void rotateProxyRef.current();
-    }, PROXY_ROTATE_MS);
+    }, proxyRotateMs());
   }, [clearRotate]);
 
   /** Crossfade to the standby element so the serverless cutoff is inaudible. */
@@ -355,11 +369,12 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   }, [stopProxies]);
 
   /**
-   * Non-Apple: play the same-origin proxy through the analyser graph.
-   * One stream feeds both speakers and FFT, so the bars match the beat exactly.
+   * Non-Apple: play the CORS proxy through the analyser graph.
+   * One stream feeds both speakers and FFT, so the bars match the beat.
+   * Prefer NEXT_PUBLIC_STREAM_PROXY_URL (Cloudflare) to avoid Vercel bandwidth.
    */
   const startSyncedPlayback = useCallback(async () => {
-    if (appleRef.current) return false;
+    if (appleRef.current || !SITE.realtimeSpectrum) return false;
     if (!buildGraph()) return false;
 
     const ctx = ctxRef.current;
@@ -451,8 +466,9 @@ export function RadioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     appleRef.current = isAppleWebKitPlayback();
-    setSpectrumMode(appleRef.current ? "simulated" : "realtime");
-    if (!appleRef.current) {
+    const wantRealtime = !appleRef.current && SITE.realtimeSpectrum;
+    setSpectrumMode(wantRealtime ? "realtime" : "simulated");
+    if (wantRealtime) {
       // Build the graph up front so Play only needs the network
       buildGraph();
     }

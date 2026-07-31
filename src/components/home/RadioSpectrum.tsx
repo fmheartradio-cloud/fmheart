@@ -193,10 +193,10 @@ export function RadioSpectrum({ className }: Props) {
       }
 
       const lively = active && (hasSignal || isPlaying || !useRealtime);
-      // Near-instant attack keeps bars on the beat; only the fall is smoothed
-      const attack = lively ? 1.9 : 0.08;
-      const release = lively ? 0.38 : 0.07;
-      const peakFall = lively ? 1.05 : 0.35;
+      // Slightly smoothed — still on the beat, less twitchy than raw FFT
+      const attack = lively ? 0.95 : 0.08;
+      const release = lively ? 0.28 : 0.07;
+      const peakFall = lively ? 0.9 : 0.35;
 
       for (let i = 0; i < BAR_COUNT; i++) {
         const target = Math.min(1, targets[i]!);
