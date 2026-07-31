@@ -141,7 +141,8 @@ function readingTime(body: string): number {
 const NEWSBOT_USER_AGENT = "FMHeartNewsBot/1.0 (+https://fmheart.lk)";
 
 const MIN_BODY_CHARS = 280;
-const MAX_BODY_CHARS = 10000;
+/** Soft cap for stored article body (Sinhala + optional EN can exceed 10k). */
+const MAX_BODY_CHARS = 20_000;
 
 function unwrapCdata(raw: string): string {
   const trimmed = raw.trim();
@@ -564,6 +565,11 @@ function articleFetchUrl(sourceUrl: string): string {
 function extractArticleBodyFromHtml(html: string, pageUrl: string): string {
   const host = hostOf(pageUrl);
 
+  if (host.includes("lankacnews.com")) {
+    const text = extractLankaCNewsBody(html);
+    if (text.length >= MIN_BODY_CHARS) return capBody(text);
+  }
+
   if (host.includes("ada.lk")) {
     // single-body-wrap nests share widgets; non-greedy </div> stops too early.
     const wrap = extractContainerFragment(
@@ -957,6 +963,50 @@ function isLankadeepaHost(url: string): boolean {
   return hostOf(url).includes("lankadeepa.lk");
 }
 
+function isLankaCNewsHost(url: string): boolean {
+  return hostOf(url).includes("lankacnews.com");
+}
+
+/**
+ * Lanka C News (Blogger): full post lives in #post-body / .post-body.
+ * Nested <div class="separator"> breaks non-greedy </div> scrapers and truncates
+ * the Sinhala section. Prefer Sinhala paragraphs when the post is bilingual.
+ */
+function extractLankaCNewsBody(html: string): string {
+  const fragment = extractContainerFragment(
+    html,
+    /<div[^>]*(?:id=["']post-body["']|class=["'][^"']*\bpost-body\b[^"']*["'])[^>]*>/i,
+    [
+      /<div[^>]+class=["'][^"']*\bpost-footer\b/i,
+      /<div[^>]+class=["'][^"']*\bblog-pager\b/i,
+      /<div[^>]+id=["']blog-pager["']/i,
+      /<a\s+name=["']more["']/i,
+    ],
+  );
+  if (!fragment) return "";
+
+  const paragraphs: string[] = [];
+  for (const match of fragment.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)) {
+    const text = stripInlineHtml(match[1]);
+    if (text.length < 40) continue;
+    if (/^\*?\s*Note\s*:/i.test(text)) continue;
+    if (/discrepancy between the Sinhala and English/i.test(text)) continue;
+    paragraphs.push(text);
+  }
+
+  if (!paragraphs.length) {
+    const fallback = htmlFragmentToParagraphs(fragment);
+    return fallback.length >= MIN_BODY_CHARS ? fallback : "";
+  }
+
+  const sinhala = paragraphs.filter((t) => /[\u0D80-\u0DFF]/.test(t));
+  // Bilingual posts: keep full Sinhala block (English is a translation duplicate)
+  const chosen =
+    sinhala.length >= 2 ? sinhala : paragraphs.length ? paragraphs : sinhala;
+  const joined = chosen.join("\n\n");
+  return joined.length >= MIN_BODY_CHARS ? joined : "";
+}
+
 /**
  * Lankadeepa hero is the first image inside `.article-body` (og:image is a
  * site-wide logo / default share card on every story).
@@ -1322,7 +1372,8 @@ function parseRssItems(xml: string, limit: number): FeedItem[] {
     const description = stripHtml(descriptionRaw);
     const content = stripHtml(contentRaw);
     if (!title) continue;
-    const body = (content || description || title).slice(0, 4000);
+    // Don't hard-truncate RSS body — page fetch upgrades thin/incomplete copy.
+    const body = content || description || title;
     items.push({
       title,
       sourceUrl: link,
@@ -1462,7 +1513,10 @@ async function fetchRss(url: string, limit: number): Promise<FeedItem[]> {
   return mapWithConcurrency(items, 3, async (item) => {
     if (!item.sourceUrl) return item;
     const needsCover = coverNeedsPageFetch(item.coverImage);
+    const lankac = isLankaCNewsHost(item.sourceUrl);
+    // Blogger RSS / description is often incomplete — always prefer full page body.
     const needsBody =
+      lankac ||
       isBodyTooShort(item.body, item.title) ||
       containsHtmlMarkup(item.body);
     const needsExcerpt =
@@ -1484,9 +1538,14 @@ async function fetchRss(url: string, limit: number): Promise<FeedItem[]> {
       };
     }
 
+    const pageBody = pageData.body || "";
     const body =
-      needsBody && pageData.body && !bodyLooksLikeTitle(pageData.body, item.title)
-        ? pageData.body
+      pageBody &&
+      (needsBody ||
+        pageBody.length > item.body.trim().length * 1.1 ||
+        (lankac && /[\u0D80-\u0DFF]/.test(pageBody))) &&
+      !bodyLooksLikeTitle(pageBody, item.title)
+        ? pageBody
         : containsHtmlMarkup(item.body)
           ? toPlainText(pageData.body || item.body)
           : item.body;
@@ -1656,7 +1715,9 @@ export async function runNewsIngest(options?: {
           const needsCover =
             !existingCover ||
             (await isUnusableCover(existingCover, item.sourceUrl));
+          const lankac = isLankaCNewsHost(item.sourceUrl);
           const needsBody =
+            lankac ||
             bodyLooksLikeTitle(existingBody, title) ||
             containsHtmlMarkup(existingBody) ||
             bodyNeedsCleanup(existingBody);
@@ -1763,7 +1824,12 @@ export async function runNewsIngest(options?: {
 
           if (needsBody) {
             let fullerBody = toPlainText(item.body);
-            if (bodyLooksLikeTitle(fullerBody, title)) {
+            if (
+              lankac ||
+              bodyLooksLikeTitle(fullerBody, title) ||
+              (pageData?.body &&
+                pageData.body.length > fullerBody.length * 1.1)
+            ) {
               fullerBody = pageData?.body || fullerBody;
             }
             fullerBody = stripSourceAttribution(fullerBody);
@@ -1772,7 +1838,8 @@ export async function runNewsIngest(options?: {
               bodyNeedsCleanup(existingBody) &&
               cleanedExisting &&
               cleanedExisting !== existingBody &&
-              !bodyLooksLikeTitle(cleanedExisting, title)
+              !bodyLooksLikeTitle(cleanedExisting, title) &&
+              !(lankac && pageData?.body && pageData.body.length > cleanedExisting.length)
             ) {
               updates.body = capBody(cleanedExisting);
               updates.readingTimeMin = readingTime(String(updates.body));
