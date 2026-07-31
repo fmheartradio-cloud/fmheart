@@ -6,9 +6,10 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
- * Same-origin Icecast proxy for Web Audio AnalyserNode only.
- * Do NOT use for long listening — Vercel maxDuration cuts the stream (~5 min).
- * Primary playback uses SITE.streamUrl directly from the browser.
+ * Same-origin Icecast proxy. Non-Apple browsers play *through* this so the
+ * AnalyserNode reads the exact samples the listener hears (FFT stays in sync).
+ * maxDuration cuts each connection near 5 min — the client crossfades to a
+ * second connection before that, and Apple/WebKit plays SITE.streamUrl direct.
  */
 export async function GET() {
   try {
