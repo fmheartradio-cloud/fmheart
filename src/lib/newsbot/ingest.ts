@@ -397,7 +397,11 @@ function stripSourceAttribution(body: string): string {
 }
 
 function bodyHasNethAttribution(body: string): boolean {
-  return /appeared\s+first\s+on\s+Neth\s+News/i.test(body);
+  return (
+    /appeared\s+first\s+on\s+Neth\s+News/i.test(body) ||
+    /නෙත්\s*නිවුස්\s*නියෝජිත/u.test(body) ||
+    /නෙත්\s*නිවුස්/u.test(body)
+  );
 }
 
 /** Lanka Hot News share CTA leaked into article body. */

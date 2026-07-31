@@ -80,28 +80,102 @@ export function containsHtmlMarkup(text: string): boolean {
  *  and Lanka Hot News share CTAs that leak into plain body text. */
 export function stripSyndicationFooter(text: string): string {
   if (!text) return "";
-  return text
-    .replace(
-      /\s*The\s+post\s+[\s\S]+?\s+appeared\s+first\s+on\s+Neth\s+News\.?\s*/gi,
-      " ",
-    )
-    .replace(
-      /\s*The\s+post\s+[\s\S]+?\s+appeared\s+first\s+on\s+[^\n.]+\.?\s*/gi,
-      " ",
-    )
-    // Lanka Hot News in-body share widget → plain text
-    .replace(
-      /\s*මේ\s*පුවත\s*තව\s*අයට\s*බලන්න[\s\S]*?WhatsApp\s*එකට\s*Share\s*කරන්න\.?\s*/giu,
-      " ",
-    )
-    .replace(
-      /\s*Facebook\s*එකට\s*Share\s*කරන්න\s*WhatsApp\s*එකට\s*Share\s*කරන්න\.?\s*/giu,
-      " ",
-    )
-    .replace(
-      /\s*මේ\s*පුවත\s*තව\s*අයට\s*බලන්න\s*/giu,
-      " ",
-    )
+  return stripNethReporterAttribution(
+    text
+      .replace(
+        /\s*The\s+post\s+[\s\S]+?\s+appeared\s+first\s+on\s+Neth\s+News\.?\s*/gi,
+        " ",
+      )
+      .replace(
+        /\s*The\s+post\s+[\s\S]+?\s+appeared\s+first\s+on\s+[^\n.]+\.?\s*/gi,
+        " ",
+      )
+      // Lanka Hot News in-body share widget → plain text
+      .replace(
+        /\s*මේ\s*පුවත\s*තව\s*අයට\s*බලන්න[\s\S]*?WhatsApp\s*එකට\s*Share\s*කරන්න\.?\s*/giu,
+        " ",
+      )
+      .replace(
+        /\s*Facebook\s*එකට\s*Share\s*කරන්න\s*WhatsApp\s*එකට\s*Share\s*කරන්න\.?\s*/giu,
+        " ",
+      )
+      .replace(
+        /\s*මේ\s*පුවත\s*තව\s*අයට\s*බලන්න\s*/giu,
+        " ",
+      )
+      .replace(/[ \t]{2,}/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim(),
+  );
+}
+
+/**
+ * Neth News in-body reporter credits:
+ * - "නෙත් නිවුස් නියෝජිත ජයන්ත වීරසේකර පැවසුවේ." → drop the whole sentence
+ *   (any reporter name after නියෝජිත)
+ * - bare "නෙත් නිවුස්" label → remove
+ * Never strip only the name mid-sentence — that would change meaning.
+ */
+export function stripNethReporterAttribution(text: string): string {
+  if (!text) return "";
+  if (!/නෙත්\s*නිවුස්|Neth\s*News/iu.test(text)) return text;
+
+  const nethRep =
+    /නෙත්\s*නිවුස්\s*නියෝජිත(?:යා|යන්|වරයා|වරුන්)?/u;
+  const bareNethOnly = /^[(\["'\s]*නෙත්\s*නිවුස්[)\]"'\s.!?…]*$/u;
+
+  const paras = text.split(/\n{2,}/);
+  const out: string[] = [];
+
+  for (const para of paras) {
+    const raw = para.trim();
+    if (!raw) continue;
+
+    // Split into sentences; keep Sinhala/English end punctuation
+    const parts = raw.split(/(?<=[.!?…])\s+/u);
+    const kept: string[] = [];
+
+    for (const part of parts) {
+      let s = part.trim();
+      if (!s) continue;
+
+      // Whole-sentence drop: Neth correspondent + name (+ පැවසුවේ etc.)
+      if (nethRep.test(s)) continue;
+
+      // Standalone "නෙත් නිවුස්" line / stub
+      if (bareNethOnly.test(s)) continue;
+
+      // Parenthetical / trailing brand credit
+      s = s
+        .replace(/\(\s*නෙත්\s*නිවුස්\s*\)/gu, "")
+        .replace(/\[\s*නෙත්\s*නිවුස්\s*\]/gu, "")
+        .replace(/\s*[-–—]\s*නෙත්\s*නිවුස්\.?\s*$/gu, "")
+        .replace(/^\s*නෙත්\s*නිවුස්\s*[-–—:]\s*/gu, "")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+
+      if (!s || bareNethOnly.test(s)) continue;
+
+      // Remaining bare "නෙත් නිවුස්" (not නියෝජිත — already handled):
+      // remove the phrase; if almost nothing left, drop the sentence.
+      if (/නෙත්\s*නිවුස්/u.test(s)) {
+        const without = s
+          .replace(/\s*නෙත්\s*නිවුස්\s*/gu, " ")
+          .replace(/\s{2,}/g, " ")
+          .replace(/^[,.\s:;–—-]+|[,.\s:;–—-]+$/g, "")
+          .trim();
+        if (without.length < 12) continue;
+        s = without;
+      }
+
+      kept.push(s);
+    }
+
+    if (kept.length) out.push(kept.join(" "));
+  }
+
+  return out
+    .join("\n\n")
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
