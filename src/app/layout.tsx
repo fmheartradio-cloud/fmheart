@@ -125,9 +125,11 @@ export default function RootLayout({
       lang="si"
       className={`${notoSansSinhala.variable} ${gemunuLibre.variable} ${abhayaLibre.variable} ${yaldevi.variable} h-full`}
     >
+      <head>
+        <AdSenseScript />
+      </head>
       <body className="min-h-full bg-white font-sans text-fh-ink antialiased">
         <OrganizationJsonLd />
-        <AdSenseScript />
         <GoogleAnalytics />
         <Providers>{children}</Providers>
       </body>
