@@ -68,7 +68,7 @@ export function HeroSlider({ slides: initialSlides }: HeroSliderProps) {
       ))}
 
       <div className="relative z-10 flex h-full min-h-[280px] flex-col justify-end p-4 md:min-h-[420px] md:p-8 lg:min-h-[480px]">
-        <h1 className="font-sigiri animate-fade-up max-w-3xl text-2xl font-extrabold leading-snug text-white md:text-4xl lg:text-[2.75rem]">
+        <h1 className="font-davasa animate-fade-up max-w-3xl text-2xl font-extrabold leading-snug text-white md:text-4xl lg:text-[2.75rem]">
           {slide.title}
         </h1>
         <div className="mt-4 flex items-center gap-4">

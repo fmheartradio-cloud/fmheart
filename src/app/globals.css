@@ -19,6 +19,7 @@
   --fh-white: #ffffff;
   --fh-whatsapp: #25d366;
   --font-sigiri: "AF Sigiri", var(--font-heading), sans-serif;
+  --font-davasa: "UN Davasa", var(--font-heading), sans-serif;
 }
 
 @theme inline {
@@ -36,6 +37,7 @@
   --font-feature: var(--font-feature);
   --font-news-headline: var(--font-heading);
   --font-sigiri: "AF Sigiri", var(--font-heading), sans-serif;
+  --font-davasa: "UN Davasa", var(--font-heading), sans-serif;
 }
 
 * {
