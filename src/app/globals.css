@@ -133,6 +133,6 @@ body {
 
 /* Sinhala news headlines — closest OFL match to Dasatha HarshaWeb-Raum (700). */
 .font-news-headline {
-  font-family: var(--font-heading), system-ui, sans-serif;
+  font-family: "UN Basuru", var(--font-heading), system-ui, sans-serif;
   font-weight: 700;
 }
