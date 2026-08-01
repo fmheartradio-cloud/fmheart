@@ -87,7 +87,7 @@ export function NewsGrid({
                     sizes="(max-width: 640px) calc(100vw - 1.5rem), (max-width: 1024px) calc(50vw - 1rem), 33vw"
                   />
                 </div>
-                <h3 className="font-news-headline mt-2.5 break-words text-[15px] leading-snug text-fh-ink transition group-hover:text-fh-red md:text-base">
+                <h3 className="font-news-headline mt-2.5 break-words text-[17px] leading-snug text-fh-ink transition group-hover:text-fh-red md:text-lg">
                   {article.title}
                 </h3>
                 <time className="mt-1 block text-xs text-fh-muted">
