@@ -16,6 +16,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "UN Basuru";
+  src: url("/fonts/UN-Basuru.ttf") format("truetype");
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --fh-red: #d50000;
   --fh-red-dark: #b71c1c;
@@ -28,6 +36,7 @@
   --fh-whatsapp: #25d366;
   --font-sigiri: "AF Sigiri", var(--font-heading), sans-serif;
   --font-davasa: "UN Davasa", var(--font-heading), sans-serif;
+  --font-basuru: "UN Basuru", var(--font-heading), sans-serif;
 }
 
 @theme inline {
@@ -43,9 +52,10 @@
   --font-heading: var(--font-heading);
   --font-article: var(--font-article);
   --font-feature: var(--font-feature);
-  --font-news-headline: var(--font-heading);
+  --font-news-headline: "UN Basuru", var(--font-heading), sans-serif;
   --font-sigiri: "AF Sigiri", var(--font-heading), sans-serif;
   --font-davasa: "UN Davasa", var(--font-heading), sans-serif;
+  --font-basuru: "UN Basuru", var(--font-heading), sans-serif;
 }
 
 * {
@@ -115,6 +125,10 @@ body {
 
 .font-davasa {
   font-family: "UN Davasa", var(--font-heading), sans-serif;
+}
+
+.font-basuru {
+  font-family: "UN Basuru", var(--font-heading), sans-serif;
 }
 
 /* Sinhala news headlines — closest OFL match to Dasatha HarshaWeb-Raum (700). */
