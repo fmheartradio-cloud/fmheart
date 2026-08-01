@@ -8,6 +8,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "UN Davasa";
+  src: url("/fonts/UN-Davasa.ttf") format("truetype");
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --fh-red: #d50000;
   --fh-red-dark: #b71c1c;
@@ -103,6 +111,10 @@ body {
 
 .font-sigiri {
   font-family: "AF Sigiri", var(--font-heading), sans-serif;
+}
+
+.font-davasa {
+  font-family: "UN Davasa", var(--font-heading), sans-serif;
 }
 
 /* Sinhala news headlines — closest OFL match to Dasatha HarshaWeb-Raum (700). */
