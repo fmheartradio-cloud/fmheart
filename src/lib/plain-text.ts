@@ -80,33 +80,97 @@ export function containsHtmlMarkup(text: string): boolean {
  *  and Lanka Hot News share CTAs that leak into plain body text. */
 export function stripSyndicationFooter(text: string): string {
   if (!text) return "";
-  return stripNethReporterAttribution(
-    text
-      .replace(
-        /\s*The\s+post\s+[\s\S]+?\s+appeared\s+first\s+on\s+Neth\s+News\.?\s*/gi,
-        " ",
-      )
-      .replace(
-        /\s*The\s+post\s+[\s\S]+?\s+appeared\s+first\s+on\s+[^\n.]+\.?\s*/gi,
-        " ",
-      )
-      // Lanka Hot News in-body share widget → plain text
-      .replace(
-        /\s*මේ\s*පුවත\s*තව\s*අයට\s*බලන්න[\s\S]*?WhatsApp\s*එකට\s*Share\s*කරන්න\.?\s*/giu,
-        " ",
-      )
-      .replace(
-        /\s*Facebook\s*එකට\s*Share\s*කරන්න\s*WhatsApp\s*එකට\s*Share\s*කරන්න\.?\s*/giu,
-        " ",
-      )
-      .replace(
-        /\s*මේ\s*පුවත\s*තව\s*අයට\s*බලන්න\s*/giu,
-        " ",
-      )
-      .replace(/[ \t]{2,}/g, " ")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim(),
+  return stripLankaCNewsBrand(
+    stripNethReporterAttribution(
+      text
+        .replace(
+          /\s*The\s+post\s+[\s\S]+?\s+appeared\s+first\s+on\s+Neth\s+News\.?\s*/gi,
+          " ",
+        )
+        .replace(
+          /\s*The\s+post\s+[\s\S]+?\s+appeared\s+first\s+on\s+[^\n.]+\.?\s*/gi,
+          " ",
+        )
+        // Lanka Hot News in-body share widget → plain text
+        .replace(
+          /\s*මේ\s*පුවත\s*තව\s*අයට\s*බලන්න[\s\S]*?WhatsApp\s*එකට\s*Share\s*කරන්න\.?\s*/giu,
+          " ",
+        )
+        .replace(
+          /\s*Facebook\s*එකට\s*Share\s*කරන්න\s*WhatsApp\s*එකට\s*Share\s*කරන්න\.?\s*/giu,
+          " ",
+        )
+        .replace(
+          /\s*මේ\s*පුවත\s*තව\s*අයට\s*බලන්න\s*/giu,
+          " ",
+        )
+        .replace(/[ \t]{2,}/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim(),
+    ),
   );
+}
+
+/**
+ * Lanka C News site name leaked into article body (middle or end).
+ * Removes "lankacnews" / "Lanka C News" / lankacnews.com — never the story text.
+ */
+export function stripLankaCNewsBrand(text: string): string {
+  if (!text) return "";
+  if (!/lankacnews|Lanka\s*C\s*News/iu.test(text)) return text;
+
+  const brandOnly =
+    /^[(\["'\s]*(?:lankacnews(?:\.com)?|Lanka\s*C\s*News)[)\]"'\s.!?…|/\\-]*$/iu;
+
+  const paras = text.split(/\n{2,}/);
+  const out: string[] = [];
+
+  for (const para of paras) {
+    const raw = para.trim();
+    if (!raw) continue;
+
+    const parts = raw.split(/(?<=[.!?…])\s+/u);
+    const kept: string[] = [];
+
+    for (const part of parts) {
+      let s = part.trim();
+      if (!s) continue;
+      if (brandOnly.test(s)) continue;
+
+      s = s
+        .replace(/\(\s*(?:lankacnews(?:\.com)?|Lanka\s*C\s*News)\s*\)/giu, "")
+        .replace(/\[\s*(?:lankacnews(?:\.com)?|Lanka\s*C\s*News)\s*\]/giu, "")
+        .replace(
+          /\s*[-–—|/]\s*(?:lankacnews(?:\.com)?|Lanka\s*C\s*News)\.?\s*$/giu,
+          "",
+        )
+        .replace(
+          /^\s*(?:lankacnews(?:\.com)?|Lanka\s*C\s*News)\s*[-–—:|]\s*/giu,
+          "",
+        )
+        .replace(
+          /https?:\/\/(?:www\.)?lankacnews\.com\/?\S*/giu,
+          "",
+        )
+        .replace(/\b(?:www\.)?lankacnews\.com\b/giu, "")
+        .replace(/\bLanka\s*C\s*News\b/giu, "")
+        .replace(/\blankacnews\b/giu, "")
+        .replace(/\s{2,}/g, " ")
+        .replace(/^[,.\s:;–—|/\\-]+|[,.\s:;–—|/\\-]+$/g, "")
+        .trim();
+
+      if (!s || brandOnly.test(s)) continue;
+      kept.push(s);
+    }
+
+    if (kept.length) out.push(kept.join(" "));
+  }
+
+  return out
+    .join("\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 /**

@@ -413,8 +413,16 @@ function bodyHasShareCta(body: string): boolean {
   );
 }
 
+function bodyHasLankaCNewsBrand(body: string): boolean {
+  return /lankacnews|Lanka\s*C\s*News/iu.test(body);
+}
+
 function bodyNeedsCleanup(body: string): boolean {
-  return bodyHasNethAttribution(body) || bodyHasShareCta(body);
+  return (
+    bodyHasNethAttribution(body) ||
+    bodyHasShareCta(body) ||
+    bodyHasLankaCNewsBrand(body)
+  );
 }
 
 function stripInlineHtml(raw: string): string {
