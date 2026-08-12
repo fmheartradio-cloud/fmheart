@@ -1,0 +1,8 @@
+name = "fmheart-ads-txt"
+main = "ads-txt-worker.js"
+compatibility_date = "2024-11-01"
+
+# Intercept before Vercel apex→www redirect so AdSense sees HTTP 200.
+[[routes]]
+pattern = "fmheart.lk/ads.txt"
+zone_name = "fmheart.lk"
