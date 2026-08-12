@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { AdSenseUnit } from "@/components/ads/AdSenseUnit";
 import { Footer } from "@/components/layout/Footer";
@@ -13,24 +13,76 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: "ප්‍රවෘත්ති",
-  description: "FM Heart — නවතම සිංහල ප්‍රවෘත්ති, breaking news සහ analysis.",
+  title: "උණුසුම් පුවත්",
+  description: "FM Heart — නවතම සිංහල උණුසුම් පුවත්, breaking news සහ analysis.",
 };
 
-export default async function NewsPage() {
-  const articles = await listArticles({ type: "news", limit: 30 });
+const CATEGORY_ALIASES: Record<string, string[]> = {
+  "ක්‍රීඩා": ["ක්‍රීඩා"],
+  "ව්‍යාපාර": ["ව්‍යාපාර", "ව්‍යාපාරික"],
+};
+
+function normalizeCategory(input: string | undefined): string {
+  const raw = decodeURIComponent((input || "").trim());
+  if (!raw) return "";
+  for (const [canonical, aliases] of Object.entries(CATEGORY_ALIASES)) {
+    if (aliases.some((v) => v === raw)) return canonical;
+  }
+  return raw;
+}
+
+export default async function NewsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = (await searchParams) || {};
+  const categoryValue = Array.isArray(params.category)
+    ? params.category[0]
+    : params.category;
+  const selectedCategory = normalizeCategory(categoryValue);
+
+  const allNews = await listArticles({ type: "news", limit: 80 });
+  const articles = selectedCategory
+    ? allNews.filter((a) => normalizeCategory(a.category) === selectedCategory)
+    : allNews;
+
+  const pageTitle = selectedCategory ? `${selectedCategory} පුවත්` : "උණුසුම් පුවත්";
 
   return (
     <div className="min-h-screen pb-16 md:pb-0">
       <TopBar />
       <Header />
       <main className="mx-auto max-w-7xl px-3 py-8 md:px-4">
-        <h1 className="font-heading text-3xl font-extrabold md:text-4xl">
-          ප්‍රවෘත්ති
-        </h1>
-        <p className="mt-2 text-sm text-fh-muted">
-          Latest news from FM Heart newsroom
-        </p>
+        <h1 className="font-heading text-3xl font-extrabold md:text-4xl">{pageTitle}</h1>
+        <p className="mt-2 text-sm text-fh-muted">Latest news from FM Heart newsroom</p>
+
+        <div className="mt-4 flex flex-wrap gap-2 text-sm">
+          <Link
+            href="/news"
+            className={`rounded-full px-3 py-1.5 font-semibold ${
+              !selectedCategory ? "bg-fh-red text-white" : "bg-neutral-100 text-fh-ink"
+            }`}
+          >
+            උණුසුම් පුවත්
+          </Link>
+          <Link
+            href="/news?category=%E0%B6%9A%E0%B7%8A%E2%80%8D%E0%B6%BB%E0%B7%93%E0%B6%A9%E0%B7%8F"
+            className={`rounded-full px-3 py-1.5 font-semibold ${
+              selectedCategory === "ක්‍රීඩා" ? "bg-fh-red text-white" : "bg-neutral-100 text-fh-ink"
+            }`}
+          >
+            ක්‍රීඩා
+          </Link>
+          <Link
+            href="/news?category=%E0%B7%80%E0%B7%8A%E2%80%8D%E0%B6%BA%E0%B7%8F%E0%B6%B4%E0%B7%8F%E0%B6%BB"
+            className={`rounded-full px-3 py-1.5 font-semibold ${
+              selectedCategory === "ව්‍යාපාර" ? "bg-fh-red text-white" : "bg-neutral-100 text-fh-ink"
+            }`}
+          >
+            ව්‍යාපාරික
+          </Link>
+        </div>
 
         <AdSenseUnit
           slot={adSlot("header")}
