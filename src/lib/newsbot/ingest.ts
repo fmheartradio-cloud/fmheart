@@ -1443,17 +1443,16 @@ function parseNewsFirstList(html: string, limit: number): FeedItem[] {
 function parseAdaDeranaList(html: string, baseUrl: string, limit: number): FeedItem[] {
   const seen = new Set<string>();
   const items: FeedItem[] = [];
-
-  for (const match of html.matchAll(/href=["']([^"']+)["']/gi)) {
-    const href = decodeHtmlEntities((match[1] || "").trim());
-    if (!href || href.startsWith("#") || /^javascript:/i.test(href)) continue;
+  const pushCandidate = (rawUrl: string) => {
+    const href = decodeHtmlEntities((rawUrl || "").trim());
+    if (!href || href.startsWith("#") || /^javascript:/i.test(href)) return;
 
     const abs = normalizeArticleUrl(absolutizeUrl(href, baseUrl));
-    if (!abs) continue;
-    if (!hostOf(abs).includes("adaderana.lk")) continue;
-    if (/other-news\.php\?sid=/i.test(abs)) continue;
-    if (!/\/news\.php\?(?:[^#]*&)?nid=|\/biz-news\//i.test(abs)) continue;
-    if (seen.has(abs)) continue;
+    if (!abs) return;
+    if (!hostOf(abs).includes("adaderana.lk")) return;
+    if (/other-news\.php\?sid=/i.test(abs)) return;
+    if (!/\/news\.php\?(?:[^#]*&)?nid=\d+|\/biz-news\//i.test(abs)) return;
+    if (seen.has(abs)) return;
 
     seen.add(abs);
     items.push({
@@ -1464,7 +1463,19 @@ function parseAdaDeranaList(html: string, baseUrl: string, limit: number): FeedI
       coverImage: "",
       rssCategories: [],
     });
+  };
+
+  for (const match of html.matchAll(/href=["']([^"']+)["']/gi)) {
+    pushCandidate(match[1] || "");
     if (items.length >= limit) break;
+  }
+
+  // Ada Derana section pages often keep article IDs in data attributes (not href).
+  if (items.length < limit) {
+    for (const match of html.matchAll(/news\.php\?nid=\d+/gi)) {
+      pushCandidate(match[0] || "");
+      if (items.length >= limit) break;
+    }
   }
 
   return items;
