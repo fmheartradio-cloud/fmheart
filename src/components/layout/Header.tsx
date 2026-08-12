@@ -5,8 +5,20 @@ import { useState } from "react";
 import { Logo } from "@/components/ui/Logo";
 import { useRadio } from "@/context/RadioProvider";
 import { useUi } from "@/context/UiProvider";
-import { navLinks } from "@/data/mock";
 import { SITE } from "@/lib/site";
+
+const MAIN_NAV_LINKS = [
+  { href: "/", label: "මුල් පිටුව" },
+  { href: "/live", label: "LIVE RADIO" },
+  { href: "/news", label: "උණුසුම් පුවත්" },
+  { href: "/news?category=%E0%B6%9A%E0%B7%8A%E2%80%8D%E0%B6%BB%E0%B7%93%E0%B6%A9%E0%B7%8F", label: "ක්‍රීඩා" },
+  { href: "/news?category=%E0%B7%80%E0%B7%8A%E2%80%8D%E0%B6%BA%E0%B7%8F%E0%B6%B4%E0%B7%8F%E0%B6%BB", label: "ව්‍යාපාරික" },
+  { href: "/news?category=%E0%B7%80%E0%B7%92%E0%B6%AF%E0%B7%99%E0%B7%83%E0%B7%8A", label: "විදෙස්" },
+  { href: "/gossip", label: "GOSSIP" },
+  { href: "/videos", label: "VIDEOS" },
+  { href: "/advertise", label: "ADVERTISE" },
+  { href: "/contact", label: "CONTACT" },
+] as const;
 
 export function Header() {
   const { menuOpen, setMenuOpen } = useUi();
@@ -110,7 +122,7 @@ export function Header() {
 
       <nav className="hidden bg-fh-red md:block" aria-label="Main">
         <ul className="mx-auto flex max-w-7xl items-center gap-0.5 overflow-x-auto px-2">
-          {navLinks.map((link) => (
+          {MAIN_NAV_LINKS.map((link) => (
             <li key={link.href}>
               <Link
                 href={link.href}
@@ -129,7 +141,7 @@ export function Header() {
           aria-label="Mobile menu"
         >
           <ul className="max-h-[70vh] overflow-y-auto px-2 py-2">
-            {navLinks.map((link) => (
+            {MAIN_NAV_LINKS.map((link) => (
               <li key={link.href}>
                 <Link
                   href={link.href}

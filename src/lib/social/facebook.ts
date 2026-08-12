@@ -176,9 +176,9 @@ export function isNewsbotFacebookAutoPostEnabled(): boolean {
 }
 
 export function newsbotFacebookMaxPerRun(): number {
-  const raw = Number(process.env.FACEBOOK_NEWSBOT_MAX_PER_RUN || "5");
-  if (!Number.isFinite(raw) || raw < 0) return 5;
-  return Math.min(Math.floor(raw), 20);
+  const raw = Number(process.env.FACEBOOK_NEWSBOT_MAX_PER_RUN || "20");
+  if (!Number.isFinite(raw) || raw < 0) return 20;
+  return Math.min(Math.floor(raw), 100);
 }
 
 type ArticleFacebookFields = {

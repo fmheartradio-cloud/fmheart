@@ -67,6 +67,27 @@ export const DEFAULT_NEWS_SOURCES: NewsSource[] = [
     active: true,
   },
   {
+    id: "adaderana-business",
+    name: "Ada Derana Biz",
+    listUrl: "https://biz.adaderana.lk/",
+    category: "ව්‍යාපාර",
+    active: true,
+  },
+  {
+    id: "adaderana-sports",
+    name: "Ada Derana Sports",
+    listUrl: "https://sinhala.adaderana.lk/other-news.php?sid=39",
+    category: "ක්‍රීඩා",
+    active: true,
+  },
+  {
+    id: "adaderana-foreign",
+    name: "Ada Derana Foreign",
+    listUrl: "https://sinhala.adaderana.lk/other-news.php?sid=43",
+    category: "ලෝක පුවත්",
+    active: true,
+  },
+  {
     id: "lankaenews",
     name: "Lanka eNews",
     listUrl: "https://www.lankaenews.com/",
@@ -1419,6 +1440,36 @@ function parseNewsFirstList(html: string, limit: number): FeedItem[] {
   return items;
 }
 
+function parseAdaDeranaList(html: string, baseUrl: string, limit: number): FeedItem[] {
+  const seen = new Set<string>();
+  const items: FeedItem[] = [];
+
+  for (const match of html.matchAll(/href=["']([^"']+)["']/gi)) {
+    const href = decodeHtmlEntities((match[1] || "").trim());
+    if (!href || href.startsWith("#") || /^javascript:/i.test(href)) continue;
+
+    const abs = normalizeArticleUrl(absolutizeUrl(href, baseUrl));
+    if (!abs) continue;
+    if (!hostOf(abs).includes("adaderana.lk")) continue;
+    if (/other-news\.php\?sid=/i.test(abs)) continue;
+    if (!/\/news\.php\?(?:[^#]*&)?nid=|\/biz-news\//i.test(abs)) continue;
+    if (seen.has(abs)) continue;
+
+    seen.add(abs);
+    items.push({
+      title: "",
+      sourceUrl: abs,
+      excerpt: "",
+      body: "",
+      coverImage: "",
+      rssCategories: [],
+    });
+    if (items.length >= limit) break;
+  }
+
+  return items;
+}
+
 function parseLankaENewsList(html: string, limit: number): FeedItem[] {
   const seen = new Set<string>();
   const items: FeedItem[] = [];
@@ -1496,6 +1547,12 @@ async function fetchListPage(src: NewsSource, limit: number): Promise<FeedItem[]
     stubs = parseNewsFirstList(html, limit);
   } else if (src.id === "lankaenews") {
     stubs = parseLankaENewsList(html, limit);
+  } else if (
+    src.id === "adaderana-business" ||
+    src.id === "adaderana-sports" ||
+    src.id === "adaderana-foreign"
+  ) {
+    stubs = parseAdaDeranaList(html, listUrl, limit);
   } else {
     throw new Error(`No list parser for ${src.id}`);
   }

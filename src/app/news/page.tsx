@@ -20,6 +20,7 @@ export const metadata: Metadata = {
 const CATEGORY_ALIASES: Record<string, string[]> = {
   "ක්‍රීඩා": ["ක්‍රීඩා"],
   "ව්‍යාපාර": ["ව්‍යාපාර", "ව්‍යාපාරික"],
+  "ලෝක පුවත්": ["ලෝක පුවත්", "විදෙස්", "විදේශීය", "ජාත්‍යන්තර"],
 };
 
 function normalizeCategory(input: string | undefined): string {
@@ -81,6 +82,14 @@ export default async function NewsPage({
             }`}
           >
             ව්‍යාපාරික
+          </Link>
+          <Link
+            href="/news?category=%E0%B7%80%E0%B7%92%E0%B6%AF%E0%B7%99%E0%B7%83%E0%B7%8A"
+            className={`rounded-full px-3 py-1.5 font-semibold ${
+              selectedCategory === "ලෝක පුවත්" ? "bg-fh-red text-white" : "bg-neutral-100 text-fh-ink"
+            }`}
+          >
+            විදෙස්
           </Link>
         </div>
 
