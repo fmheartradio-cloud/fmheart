@@ -182,7 +182,18 @@ export type CategoryInferenceInput = {
   rssCategories?: string[];
 };
 
+/** Section feeds keep the source category — never keyword-reclassify. */
+const PINNED_SOURCE_IDS = new Set([
+  "adaderana-business",
+  "adaderana-sports",
+  "adaderana-foreign",
+]);
+
 export function inferNewsCategory(input: CategoryInferenceInput): string {
+  if (PINNED_SOURCE_IDS.has(input.sourceId)) {
+    return input.sourceDefaultCategory || "දේශීය";
+  }
+
   if (input.sourceId === "bbc-sinhala") {
     return "ජාත්‍යන්තර";
   }
@@ -205,11 +216,14 @@ export function shouldUpgradeIngestedCategory(
   existingCategory: string,
   sourceDefaultCategory: string,
   inferredCategory: string,
+  sourceId?: string,
 ): boolean {
   const existing = existingCategory.trim();
   const sourceDefault = sourceDefaultCategory.trim();
   const inferred = inferredCategory.trim();
-  if (!existing || !inferred || existing === inferred) return false;
+  if (!inferred || existing === inferred) return false;
+  if (sourceId && PINNED_SOURCE_IDS.has(sourceId)) return true;
+  if (!existing) return false;
   return existing === sourceDefault;
 }
 

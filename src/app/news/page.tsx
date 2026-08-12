@@ -20,8 +20,21 @@ export const metadata: Metadata = {
 const CATEGORY_ALIASES: Record<string, string[]> = {
   "ක්‍රීඩා": ["ක්‍රීඩා"],
   "ව්‍යාපාර": ["ව්‍යාපාර", "ව්‍යාපාරික"],
-  "ලෝක පුවත්": ["ලෝක පුවත්", "විදෙස්", "විදේශීය", "ජාත්‍යන්තර"],
+  "විදෙස්": ["විදෙස්"],
 };
+
+const FOREIGN_NEWS_SOURCES = new Set(["Ada Derana Foreign"]);
+
+function isAdaDeranaForeignArticle(article: {
+  category?: string;
+  source?: string;
+  tags?: string[];
+}): boolean {
+  const source = (article.source || "").trim();
+  if (FOREIGN_NEWS_SOURCES.has(source)) return true;
+  if ((article.tags || []).includes("Ada Derana Foreign")) return true;
+  return normalizeCategory(article.category) === "විදෙස්";
+}
 
 function normalizeCategory(input: string | undefined): string {
   const raw = decodeURIComponent((input || "").trim());
@@ -43,12 +56,19 @@ export default async function NewsPage({
     : params.category;
   const selectedCategory = normalizeCategory(categoryValue);
 
-  const allNews = await listArticles({ type: "news", limit: 80 });
+  const allNews = await listArticles({ type: "news", limit: 200 });
   const articles = selectedCategory
-    ? allNews.filter((a) => normalizeCategory(a.category) === selectedCategory)
+    ? selectedCategory === "විදෙස්"
+      ? allNews.filter(isAdaDeranaForeignArticle)
+      : allNews.filter((a) => normalizeCategory(a.category) === selectedCategory)
     : allNews;
 
-  const pageTitle = selectedCategory ? `${selectedCategory} පුවත්` : "උණුසුම් පුවත්";
+  const pageTitle =
+    selectedCategory === "විදෙස්"
+      ? "විදෙස් පුවත්"
+      : selectedCategory
+        ? `${selectedCategory} පුවත්`
+        : "උණුසුම් පුවත්";
 
   return (
     <div className="min-h-screen pb-16 md:pb-0">
@@ -86,7 +106,7 @@ export default async function NewsPage({
           <Link
             href="/news?category=%E0%B7%80%E0%B7%92%E0%B6%AF%E0%B7%99%E0%B7%83%E0%B7%8A"
             className={`rounded-full px-3 py-1.5 font-semibold ${
-              selectedCategory === "ලෝක පුවත්" ? "bg-fh-red text-white" : "bg-neutral-100 text-fh-ink"
+              selectedCategory === "විදෙස්" ? "bg-fh-red text-white" : "bg-neutral-100 text-fh-ink"
             }`}
           >
             විදෙස්

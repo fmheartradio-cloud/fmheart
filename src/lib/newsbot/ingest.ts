@@ -84,7 +84,7 @@ export const DEFAULT_NEWS_SOURCES: NewsSource[] = [
     id: "adaderana-foreign",
     name: "Ada Derana Foreign",
     listUrl: "https://sinhala.adaderana.lk/other-news.php?sid=43",
-    category: "ලෝක පුවත්",
+    category: "විදෙස්",
     active: true,
   },
   {
@@ -1966,6 +1966,7 @@ export async function runNewsIngest(options?: {
               existingCategory,
               src.category,
               inferredCategory,
+              src.id,
             )
           ) {
             updates.category = inferredCategory;
@@ -2042,8 +2043,16 @@ export async function runNewsIngest(options?: {
           continue;
         }
 
-        // Ada Derana CDN stills always have burnt-in ADA/අද දෙරණ watermarks.
-        if (/adaderanasinhala|cdn\.ada\.lk/i.test(coverImage)) {
+        // Hot-news Ada Derana CDN stills have burnt-in watermarks.
+        // Section feeds (biz / sports / foreign) must still publish.
+        const allowAdaSectionCover =
+          src.id === "adaderana-business" ||
+          src.id === "adaderana-sports" ||
+          src.id === "adaderana-foreign";
+        if (
+          !allowAdaSectionCover &&
+          /adaderanasinhala|cdn\.ada\.lk/i.test(coverImage)
+        ) {
           row.skipped += 1;
           continue;
         }
@@ -2056,7 +2065,8 @@ export async function runNewsIngest(options?: {
 
         // Ada Derana (etc.) covers with burnt-in brand watermark → skip that news only.
         if (
-          await shouldSkipNewsForCoverWatermark(coverImage, item.sourceUrl)
+          !allowAdaSectionCover &&
+          (await shouldSkipNewsForCoverWatermark(coverImage, item.sourceUrl))
         ) {
           row.skipped += 1;
           continue;
@@ -2361,6 +2371,13 @@ async function removeWatermarkedAdaArticles(
     const sourceUrl = String(data.sourceUrl || "").trim();
     const source = String(data.source || "");
     if (!cover) return false;
+    if (
+      source === "Ada Derana Foreign" ||
+      source === "Ada Derana Sports" ||
+      source === "Ada Derana Biz"
+    ) {
+      return false;
+    }
     return (
       source === "Ada Derana Sinhala" ||
       /adaderana|adaderanasinhala|cdn\.ada\.lk/i.test(`${cover} ${sourceUrl}`)
