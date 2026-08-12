@@ -1,9 +1,11 @@
 ﻿import type { Article, RadioState, VideoItem } from "@/types";
 
 export const navLinks = [
-  { href: "/", label: "à¶¸à·”à¶½à·Š à¶´à·’à¶§à·”à·€" },
+  { href: "/", label: "මුල් පිටුව" },
   { href: "/live", label: "LIVE RADIO" },
-  { href: "/news", label: "à¶´à·Šâ€à¶»à·€à·˜à¶­à·Šà¶­à·’" },
+  { href: "/news", label: "උණුසුම් පුවත්" },
+  { href: "/news?category=%E0%B6%9A%E0%B7%8A%E2%80%8D%E0%B6%BB%E0%B7%93%E0%B6%A9%E0%B7%8F", label: "ක්‍රීඩා" },
+  { href: "/news?category=%E0%B7%80%E0%B7%8A%E2%80%8D%E0%B6%BA%E0%B7%8F%E0%B6%B4%E0%B7%8F%E0%B6%BB", label: "ව්‍යාපාරික" },
   { href: "/gossip", label: "GOSSIP" },
   { href: "/videos", label: "VIDEOS" },
   { href: "/advertise", label: "ADVERTISE" },
@@ -230,4 +232,5 @@ export const mostRead: Article[] = [
     slug: "whatsapp-update",
   },
 ];
+
 
