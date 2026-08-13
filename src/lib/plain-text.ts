@@ -1,4 +1,5 @@
 import { decodeHtmlEntities } from "@/lib/html-entities";
+import { normalizeSinhalaConjuncts } from "@/lib/sinhala-conjuncts";
 
 function unwrapCdata(raw: string): string {
   const trimmed = raw.trim();
@@ -252,7 +253,7 @@ export function toPlainText(raw: string): string {
     ? stripHtml(raw)
     : decodeHtmlEntities(raw).replace(/\s+/g, " ").trim();
   if (!base || looksLikeHtmlFragment(base)) return "";
-  return stripSyndicationFooter(base);
+  return normalizeSinhalaConjuncts(stripSyndicationFooter(base));
 }
 
 export function toPlainExcerpt(

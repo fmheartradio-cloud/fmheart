@@ -2,7 +2,7 @@ import { heroSlides as mockSlides } from "@/data/mock";
 import { formatSriLankaDateTime } from "@/lib/datetime";
 import { isFirebaseConfigured } from "@/lib/firebase/client";
 import { finalizeCoverUrl, upgradeImageUrl } from "@/lib/image-url";
-import { toHeroExcerpt } from "@/lib/plain-text";
+import { toHeroExcerpt, toPlainText } from "@/lib/plain-text";
 import { listArticles, mapFirebaseError } from "@/services/articles";
 import type { Article } from "@/types";
 import type { CmsArticle } from "@/types/cms";
@@ -31,7 +31,8 @@ function normalizeSlides(raw: unknown): Article[] {
   raw.forEach((item, i) => {
     if (!item || typeof item !== "object") return;
     const row = item as Record<string, unknown>;
-    const title = typeof row.title === "string" ? row.title.trim() : "";
+    const title =
+      typeof row.title === "string" ? toPlainText(row.title).trim() : "";
     const image = typeof row.image === "string" ? row.image.trim() : "";
     const slug = typeof row.slug === "string" ? row.slug.trim() : "";
     const category =

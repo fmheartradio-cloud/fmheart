@@ -1765,7 +1765,7 @@ export async function runNewsIngest(options?: {
       row.fetched = items.length;
 
       for (const item of items) {
-        const title = item.title.trim();
+        const title = toPlainText(item.title).trim();
         if (!title) {
           row.skipped += 1;
           continue;
