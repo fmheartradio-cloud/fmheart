@@ -11,7 +11,8 @@
 @font-face {
   font-family: "UN Davasa";
   src: url("/fonts/UN-Davasa.ttf") format("truetype");
-  font-weight: 400 800;
+  /* Single master — do not declare a weight range (avoids faux-bold shaping bugs). */
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
@@ -19,7 +20,7 @@
 @font-face {
   font-family: "UN Basuru";
   src: url("/fonts/UN-Basuru.ttf") format("truetype");
-  font-weight: 400 800;
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
@@ -52,7 +53,8 @@
   --font-heading: var(--font-heading);
   --font-article: var(--font-article);
   --font-feature: var(--font-feature);
-  --font-news-headline: "UN Basuru", var(--font-heading), sans-serif;
+  /* Abhaya Libre first — UN Basuru/Davasa lack GPOS, so රු etc. break. */
+  --font-news-headline: var(--font-article), var(--font-ui), system-ui, sans-serif;
   --font-sigiri: "AF Sigiri", var(--font-heading), sans-serif;
   --font-davasa: "UN Davasa", var(--font-heading), sans-serif;
   --font-basuru: "UN Basuru", var(--font-heading), sans-serif;
@@ -131,8 +133,14 @@ body {
   font-family: "UN Basuru", var(--font-heading), sans-serif;
 }
 
-/* Sinhala news headlines — closest OFL match to Dasatha HarshaWeb-Raum (700). */
+/*
+ * Sinhala news headlines.
+ * Use Abhaya Libre (proper GSUB/GPOS) — local UN Basuru/Davasa fonts omit GPOS,
+ * so below-base vowels like රු render as a detached ු.
+ */
 .font-news-headline {
-  font-family: "UN Basuru", var(--font-heading), system-ui, sans-serif;
+  font-family: var(--font-article), var(--font-ui), system-ui, sans-serif;
   font-weight: 700;
+  font-synthesis: none;
+  letter-spacing: 0;
 }
