@@ -49,7 +49,7 @@ export function HeroSlider({ slides: initialSlides }: HeroSliderProps) {
             className="object-cover"
             sizes="(max-width: 1024px) calc(100vw - 1.5rem), 70vw"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-white via-white/70 to-black/15" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/20" />
           <div
             className="pointer-events-none absolute top-3 left-3 z-[1] w-[20%] max-w-[110px] md:top-4 md:left-4 md:w-[15%] md:max-w-[140px] lg:max-w-[155px]"
             aria-hidden
@@ -68,7 +68,7 @@ export function HeroSlider({ slides: initialSlides }: HeroSliderProps) {
       ))}
 
       <div className="relative z-10 flex h-full min-h-[280px] flex-col justify-end p-4 md:min-h-[420px] md:p-8 lg:min-h-[480px]">
-        <h1 className="font-davasa animate-fade-up max-w-3xl text-2xl font-normal leading-snug text-fh-black md:text-4xl lg:text-[2.75rem]">
+        <h1 className="font-davasa animate-fade-up max-w-3xl text-2xl font-normal leading-snug text-white md:text-4xl lg:text-[2.75rem]">
           {slide.title}
         </h1>
         <div className="mt-4 flex items-center gap-4">
