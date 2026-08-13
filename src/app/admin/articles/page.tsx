@@ -11,6 +11,8 @@ import {
 } from "@/services/articles";
 import type { CmsArticle, CmsArticleInput, ContentType } from "@/types/cms";
 
+const PAGE_SIZE = 10;
+
 const emptyForm: CmsArticleInput = {
   type: "news",
   title: "",
@@ -33,10 +35,11 @@ export default function AdminArticlesPage() {
   const [busy, setBusy] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [filter, setFilter] = useState<"all" | "draft" | "published">("all");
+  const [page, setPage] = useState(1);
   const [postToFacebook, setPostToFacebook] = useState(true);
 
   async function refresh() {
-    const items = await listArticles({ status: "all", limit: 80 });
+    const items = await listArticles({ status: "all", limit: 200 });
     setArticles(items);
   }
 
@@ -44,6 +47,14 @@ export default function AdminArticlesPage() {
     filter === "all" ? true : a.status === filter,
   );
   const draftCount = articles.filter((a) => a.status === "draft").length;
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paged = visible.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
+  const rangeStart = visible.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(currentPage * PAGE_SIZE, visible.length);
 
   useEffect(() => {
     void refresh();
@@ -149,7 +160,10 @@ export default function AdminArticlesPage() {
             <button
               key={key}
               type="button"
-              onClick={() => setFilter(key)}
+              onClick={() => {
+                setFilter(key);
+                setPage(1);
+              }}
               className={`px-3 py-1.5 font-heading text-xs font-bold ${
                 filter === key
                   ? "bg-fh-red text-white"
@@ -315,8 +329,14 @@ export default function AdminArticlesPage() {
             Articles ({visible.length}
             {filter !== "all" ? ` · ${filter}` : ""})
           </h2>
+          <p className="mt-1 text-xs text-fh-muted">
+            Latest {PAGE_SIZE} per page
+            {visible.length > 0
+              ? ` · ${rangeStart}–${rangeEnd} of ${visible.length}`
+              : ""}
+          </p>
           <ul className="mt-4 divide-y divide-neutral-100">
-            {visible.map((a) => (
+            {paged.map((a) => (
               <li
                 key={a.id}
                 className="flex items-start justify-between gap-3 py-3"
@@ -453,6 +473,29 @@ export default function AdminArticlesPage() {
               </li>
             ))}
           </ul>
+          {visible.length > PAGE_SIZE ? (
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                disabled={currentPage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="border border-neutral-300 px-3 py-1.5 font-heading text-xs font-bold disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <p className="text-xs text-fh-muted">
+                Page {currentPage} / {totalPages}
+              </p>
+              <button
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="bg-fh-red px-3 py-1.5 font-heading text-xs font-bold text-white disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
