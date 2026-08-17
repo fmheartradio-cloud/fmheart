@@ -21,6 +21,7 @@ const brandLinks = [
     label: "Pulse Studio",
     external: true,
   },
+  { href: "/about", label: "About" },
   { href: "/advertise", label: "Advertise With Us" },
   { href: "/contact", label: "Contact" },
 ];
@@ -163,6 +164,9 @@ export function Footer() {
       <div className="mx-auto flex max-w-7xl flex-col items-start justify-center gap-3 px-4 py-3 text-left text-xs text-neutral-500 md:flex-row md:items-center md:justify-between">
         <p>© {new Date().getFullYear()} FM Heart. All rights reserved.</p>
         <div className="flex gap-4">
+          <Link href="/about" className="hover:text-neutral-300">
+            About
+          </Link>
           <Link href="/privacy" className="hover:text-neutral-300">
             Privacy
           </Link>
