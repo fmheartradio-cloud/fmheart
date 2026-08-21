@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { renderShapedSinhala } from "@/components/ui/shapedSinhala";
 
 type Segment = { kind: "si" | "en"; text: string };
 
@@ -28,7 +27,7 @@ type MixedScriptTextProps = {
 
 /**
  * Renders mixed Sinhala + English titles.
- * Sinhala stays on parent Isi font; රු/තු clusters get shaping fix;
+ * Sinhala inherits parent Isi Basuru only (no second Sinhala face).
  * English uses Poppins ExtraBold (800) by default.
  */
 export function MixedScriptText({
@@ -37,14 +36,14 @@ export function MixedScriptText({
   latinClassName = "font-poppins font-extrabold",
   latinWeight = 800,
 }: MixedScriptTextProps) {
-  const parts = splitSinhalaLatin(text);
+  const parts = splitSinhalaLatin(text.normalize("NFC"));
   const nodes: ReactNode[] = parts.map((part, i) =>
     part.kind === "en" ? (
       <span key={`en-${i}`} className={latinClassName} style={{ fontWeight: latinWeight }}>
         {part.text}
       </span>
     ) : (
-      <span key={`si-${i}`}>{renderShapedSinhala(part.text, `si-${i}`)}</span>
+      <span key={`si-${i}`}>{part.text}</span>
     ),
   );
   if (className) {

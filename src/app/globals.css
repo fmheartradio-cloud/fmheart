@@ -90,8 +90,7 @@
   --font-feature: var(--font-feature);
   --font-poppins: var(--font-poppins);
   --font-oswald: var(--font-oswald);
-  --font-news-headline: "Isi Basuru Si", var(--font-poppins), "Isi Basuru",
-    var(--font-heading), sans-serif;
+  --font-news-headline: "Isi Basuru Si", "Isi Basuru", var(--font-poppins), sans-serif;
   --font-sigiri: "AF Sigiri", var(--font-heading), sans-serif;
   --font-davasa: "UN Davasa Si", var(--font-poppins), "UN Davasa", var(--font-heading),
     sans-serif;
@@ -190,7 +189,8 @@ body {
 }
 
 .font-news-headline {
-  font-family: "Isi Basuru Si", var(--font-poppins), system-ui, sans-serif;
+  /* Sinhala: Isi Basuru only. Latin: Poppins. No system Sinhala fallback. */
+  font-family: "Isi Basuru Si", "Isi Basuru", var(--font-poppins), sans-serif;
   font-weight: 400;
   font-synthesis: none;
   letter-spacing: 0;
@@ -201,16 +201,4 @@ body {
 .font-poppins {
   font-family: var(--font-poppins), system-ui, sans-serif;
   font-synthesis: none;
-}
-
-/*
- * Isi Basuru/Davasa cannot position below-base ු/ූ (no GPOS).
- * Only those clusters use AF Sigiri for correct රු / තු shaping —
- * headline font family stays Isi for everything else.
- */
-.isi-shape-fix {
-  font-family: "AF Sigiri", var(--font-heading), system-ui, sans-serif;
-  font-weight: inherit;
-  font-synthesis: none;
-  letter-spacing: 0;
 }
