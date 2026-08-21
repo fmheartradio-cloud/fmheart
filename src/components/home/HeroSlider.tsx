@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { MixedScriptText } from "@/components/ui/MixedScriptText";
 import { heroSlides as mockSlides } from "@/data/mock";
 import type { Article } from "@/types";
 
@@ -69,7 +70,11 @@ export function HeroSlider({ slides: initialSlides }: HeroSliderProps) {
 
       <div className="relative z-10 flex h-full min-h-[280px] flex-col justify-end p-4 md:min-h-[420px] md:p-8 lg:min-h-[480px]">
         <h1 className="font-hero animate-fade-up max-w-3xl text-2xl leading-snug text-white md:text-4xl lg:text-[2.75rem]">
-          {slide.title}
+          <MixedScriptText
+            text={slide.title}
+            latinClassName="font-[family-name:var(--font-oswald)]"
+            latinWeight={500}
+          />
         </h1>
         <div className="mt-4 flex items-center gap-4">
           <Link

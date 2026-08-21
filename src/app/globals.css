@@ -180,6 +180,8 @@ body {
   font-weight: 500;
   font-synthesis: none;
   letter-spacing: 0;
+  word-break: keep-all;
+  line-break: strict;
 }
 
 .font-basuru {
@@ -192,9 +194,23 @@ body {
   font-weight: 400;
   font-synthesis: none;
   letter-spacing: 0;
+  word-break: keep-all;
+  line-break: strict;
 }
 
 .font-poppins {
   font-family: var(--font-poppins), system-ui, sans-serif;
   font-synthesis: none;
+}
+
+/*
+ * Isi Basuru/Davasa cannot position below-base ු/ූ (no GPOS).
+ * Only those clusters use AF Sigiri for correct රු / තු shaping —
+ * headline font family stays Isi for everything else.
+ */
+.isi-shape-fix {
+  font-family: "AF Sigiri", var(--font-heading), system-ui, sans-serif;
+  font-weight: inherit;
+  font-synthesis: none;
+  letter-spacing: 0;
 }
