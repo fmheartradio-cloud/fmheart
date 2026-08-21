@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 type Segment = { kind: "si" | "en"; text: string };
 
-/** Split Sinhala vs Latin/other so English can use Poppins Regular. */
+/** Split Sinhala vs Latin/other so English can use Poppins ExtraBold. */
 export function splitSinhalaLatin(text: string): Segment[] {
   if (!text) return [];
   const parts: Segment[] = [];
@@ -19,23 +19,24 @@ export function splitSinhalaLatin(text: string): Segment[] {
 type MixedScriptTextProps = {
   text: string;
   className?: string;
-  /** Class for Latin/English runs (default: Poppins Regular 400). */
+  /** Class for Latin/English runs (default: Poppins ExtraBold 800). */
   latinClassName?: string;
 };
 
 /**
  * Renders mixed Sinhala + English titles.
- * Sinhala inherits parent Isi font; English uses Poppins Regular (400).
+ * Sinhala inherits parent Isi font; English uses Poppins ExtraBold (800)
+ * so Latin weight matches heavy Isi Basuru headlines.
  */
 export function MixedScriptText({
   text,
   className,
-  latinClassName = "font-poppins font-normal",
+  latinClassName = "font-poppins font-extrabold",
 }: MixedScriptTextProps) {
   const parts = splitSinhalaLatin(text);
   const nodes: ReactNode[] = parts.map((part, i) =>
     part.kind === "en" ? (
-      <span key={i} className={latinClassName} style={{ fontWeight: 400 }}>
+      <span key={i} className={latinClassName} style={{ fontWeight: 800 }}>
         {part.text}
       </span>
     ) : (
