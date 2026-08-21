@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
 import { CoverImage } from "@/components/ui/CoverImage";
+import { MixedScriptText } from "@/components/ui/MixedScriptText";
 import { adSlot } from "@/lib/ads";
 import { listArticles } from "@/services/articles";
 
@@ -132,7 +133,7 @@ export default async function NewsPage({
                   />
                 </div>
                 <h2 className="font-news-headline mt-3 text-lg leading-snug group-hover:text-fh-red">
-                  {article.title}
+                  <MixedScriptText text={article.title} />
                 </h2>
                 <p className="mt-1 line-clamp-2 font-article text-sm text-fh-muted">
                   {article.excerpt}

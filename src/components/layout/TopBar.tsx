@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { breakingHeadlines as mockHeadlines, latestNews } from "@/data/mock";
+import { MixedScriptText } from "@/components/ui/MixedScriptText";
 import {
   getLatestNewsBreakingItems,
   type BreakingItem,
@@ -51,7 +52,7 @@ export function TopBar() {
                 href={item.href}
                 className="text-neutral-200 transition hover:text-white"
               >
-                {item.title}
+                <MixedScriptText text={item.title} />
               </Link>
             ))}
           </div>

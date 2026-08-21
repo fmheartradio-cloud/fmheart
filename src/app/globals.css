@@ -188,7 +188,7 @@ body {
 }
 
 .font-news-headline {
-  font-family: "Isi Basuru Si", var(--font-poppins), "Isi Basuru", system-ui, sans-serif;
+  font-family: "Isi Basuru Si", var(--font-poppins), system-ui, sans-serif;
   font-weight: 400;
   font-synthesis: none;
   letter-spacing: 0;
@@ -196,4 +196,6 @@ body {
 
 .font-poppins {
   font-family: var(--font-poppins), system-ui, sans-serif;
+  font-weight: 400;
+  font-synthesis: none;
 }

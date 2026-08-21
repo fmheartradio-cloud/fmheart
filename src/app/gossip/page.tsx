@@ -6,6 +6,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
+import { MixedScriptText } from "@/components/ui/MixedScriptText";
 import { adSlot } from "@/lib/ads";
 import { listArticles } from "@/services/articles";
 
@@ -52,7 +53,7 @@ export default async function GossipPage() {
                   />
                 </div>
                 <h2 className="font-news-headline mt-3 text-lg leading-snug group-hover:text-fh-red">
-                  {article.title}
+                  <MixedScriptText text={article.title} />
                 </h2>
               </Link>
             </article>

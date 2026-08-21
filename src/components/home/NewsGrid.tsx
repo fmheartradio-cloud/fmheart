@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CoverImage } from "@/components/ui/CoverImage";
+import { MixedScriptText } from "@/components/ui/MixedScriptText";
 
 export type NewsCard = {
   id: string;
@@ -88,7 +89,7 @@ export function NewsGrid({
                   />
                 </div>
                 <h3 className="font-news-headline mt-2.5 text-[17px] leading-snug text-fh-ink transition group-hover:text-fh-red md:text-lg">
-                  {article.title}
+                  <MixedScriptText text={article.title} />
                 </h3>
                 <time className="mt-1 block text-xs text-fh-muted">
                   {article.publishedAt}

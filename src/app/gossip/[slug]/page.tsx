@@ -9,6 +9,7 @@ import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
 import { ArticleJsonLd } from "@/components/seo/JsonLd";
+import { MixedScriptText } from "@/components/ui/MixedScriptText";
 import { adSlot } from "@/lib/ads";
 import { SITE } from "@/lib/site";
 import { getArticleBySlug, listArticles } from "@/services/articles";
@@ -70,7 +71,7 @@ export default async function GossipArticlePage({ params }: Props) {
           </Link>
         </nav>
         <h1 className="font-news-headline mt-3 text-3xl leading-snug md:text-4xl">
-          {article.title}
+          <MixedScriptText text={article.title} />
         </h1>
         <div className="relative mt-6 aspect-[16/9] overflow-hidden bg-neutral-200">
           <Image

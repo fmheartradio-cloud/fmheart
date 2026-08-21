@@ -10,6 +10,7 @@ import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
 import { ArticleJsonLd } from "@/components/seo/JsonLd";
 import { CoverImage } from "@/components/ui/CoverImage";
+import { MixedScriptText } from "@/components/ui/MixedScriptText";
 import { ShareButtons } from "@/components/ui/ShareButtons";
 import { adSlot } from "@/lib/ads";
 import { formatSriLankaDateTime } from "@/lib/datetime";
@@ -119,7 +120,7 @@ export default async function NewsArticlePage({ params }: Props) {
             </div>
 
             <h1 className="font-news-headline mt-4 text-2xl leading-snug text-fh-ink md:mt-5 md:text-4xl">
-              {article.title}
+              <MixedScriptText text={article.title} />
             </h1>
 
             {datestamp ? (
@@ -186,7 +187,7 @@ export default async function NewsArticlePage({ params }: Props) {
                             />
                           </div>
                           <h3 className="font-news-headline text-sm leading-snug line-clamp-3">
-                            {item.title}
+                            <MixedScriptText text={item.title} />
                           </h3>
                         </Link>
                       </li>
