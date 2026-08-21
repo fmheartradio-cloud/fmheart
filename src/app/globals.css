@@ -25,6 +25,29 @@
   font-display: swap;
 }
 
+/*
+ * Sinhala-only faces for mixed headlines.
+ * Without unicode-range, Isi fonts own Latin glyphs too (e.g. "Ceylon"),
+ * so English never falls through to Poppins.
+ */
+@font-face {
+  font-family: "Isi Basuru Si";
+  src: url("/fonts/UN-Basuru.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0D80-0DFF, U+200C-200D;
+}
+
+@font-face {
+  font-family: "UN Davasa Si";
+  src: url("/fonts/UN-Davasa.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0D80-0DFF, U+200C-200D;
+}
+
 :root {
   --fh-red: #d50000;
   --fh-red-dark: #b71c1c;
@@ -36,8 +59,10 @@
   --fh-white: #ffffff;
   --fh-whatsapp: #25d366;
   --font-sigiri: "AF Sigiri", var(--font-heading), sans-serif;
-  --font-davasa: "UN Davasa", var(--font-heading), sans-serif;
-  --font-basuru: "Isi Basuru", var(--font-heading), sans-serif;
+  --font-davasa: "UN Davasa Si", var(--font-poppins), "UN Davasa", var(--font-heading),
+    sans-serif;
+  --font-basuru: "Isi Basuru Si", var(--font-poppins), "Isi Basuru", var(--font-heading),
+    sans-serif;
 }
 
 @theme inline {
@@ -53,10 +78,14 @@
   --font-heading: var(--font-heading);
   --font-article: var(--font-article);
   --font-feature: var(--font-feature);
-  --font-news-headline: "Isi Basuru", var(--font-heading), sans-serif;
+  --font-poppins: var(--font-poppins);
+  --font-news-headline: "Isi Basuru Si", var(--font-poppins), "Isi Basuru",
+    var(--font-heading), sans-serif;
   --font-sigiri: "AF Sigiri", var(--font-heading), sans-serif;
-  --font-davasa: "UN Davasa", var(--font-heading), sans-serif;
-  --font-basuru: "Isi Basuru", var(--font-heading), sans-serif;
+  --font-davasa: "UN Davasa Si", var(--font-poppins), "UN Davasa", var(--font-heading),
+    sans-serif;
+  --font-basuru: "Isi Basuru Si", var(--font-poppins), "Isi Basuru", var(--font-heading),
+    sans-serif;
 }
 
 * {
@@ -125,18 +154,24 @@ body {
 }
 
 .font-davasa {
-  font-family: "UN Davasa", var(--font-heading), sans-serif;
+  font-family: "UN Davasa Si", var(--font-poppins), "UN Davasa", var(--font-heading),
+    sans-serif;
   font-weight: 400;
   font-synthesis: none;
 }
 
 .font-basuru {
-  font-family: "Isi Basuru", var(--font-heading), sans-serif;
+  font-family: "Isi Basuru Si", var(--font-poppins), "Isi Basuru", var(--font-heading),
+    sans-serif;
 }
 
 .font-news-headline {
-  font-family: "Isi Basuru", var(--font-heading), system-ui, sans-serif;
+  font-family: "Isi Basuru Si", var(--font-poppins), "Isi Basuru", system-ui, sans-serif;
   font-weight: 400;
   font-synthesis: none;
   letter-spacing: 0;
+}
+
+.font-poppins {
+  font-family: var(--font-poppins), system-ui, sans-serif;
 }

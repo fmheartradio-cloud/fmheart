@@ -3,6 +3,7 @@ import {
   Abhaya_Libre,
   Gemunu_Libre,
   Noto_Sans_Sinhala,
+  Poppins,
   Yaldevi,
 } from "next/font/google";
 import { AdSenseScript } from "@/components/seo/AdSenseScript";
@@ -36,6 +37,14 @@ const abhayaLibre = Abhaya_Libre({
 const yaldevi = Yaldevi({
   variable: "--font-feature",
   subsets: ["sinhala", "latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+/** Latin/English in mixed Sinhala headlines (Isi fonts lack a clean Latin face). */
+const poppins = Poppins({
+  variable: "--font-poppins",
+  subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   display: "swap",
 });
@@ -123,7 +132,7 @@ export default function RootLayout({
   return (
     <html
       lang="si"
-      className={`${notoSansSinhala.variable} ${gemunuLibre.variable} ${abhayaLibre.variable} ${yaldevi.variable} h-full`}
+      className={`${notoSansSinhala.variable} ${gemunuLibre.variable} ${abhayaLibre.variable} ${yaldevi.variable} ${poppins.variable} h-full`}
     >
       <head>
         <AdSenseScript />
