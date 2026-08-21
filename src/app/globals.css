@@ -48,6 +48,16 @@
   unicode-range: U+0D80-0DFF, U+200C-200D;
 }
 
+/* Same master at 500 so hero font-weight:500 does not faux-bold Sinhala. */
+@font-face {
+  font-family: "UN Davasa Si";
+  src: url("/fonts/UN-Davasa.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0D80-0DFF, U+200C-200D;
+}
+
 :root {
   --fh-red: #d50000;
   --fh-red-dark: #b71c1c;
@@ -79,12 +89,15 @@
   --font-article: var(--font-article);
   --font-feature: var(--font-feature);
   --font-poppins: var(--font-poppins);
+  --font-oswald: var(--font-oswald);
   --font-news-headline: "Isi Basuru Si", var(--font-poppins), "Isi Basuru",
     var(--font-heading), sans-serif;
   --font-sigiri: "AF Sigiri", var(--font-heading), sans-serif;
   --font-davasa: "UN Davasa Si", var(--font-poppins), "UN Davasa", var(--font-heading),
     sans-serif;
   --font-basuru: "Isi Basuru Si", var(--font-poppins), "Isi Basuru", var(--font-heading),
+    sans-serif;
+  --font-hero: "UN Davasa Si", var(--font-oswald), "UN Davasa", var(--font-heading),
     sans-serif;
 }
 
@@ -158,6 +171,15 @@ body {
     sans-serif;
   font-weight: 400;
   font-synthesis: none;
+}
+
+/* Hero title — Sinhala Davasa + English Oswald Medium (500). */
+.font-hero {
+  font-family: "UN Davasa Si", var(--font-oswald), "UN Davasa", var(--font-heading),
+    sans-serif;
+  font-weight: 500;
+  font-synthesis: none;
+  letter-spacing: 0;
 }
 
 .font-basuru {

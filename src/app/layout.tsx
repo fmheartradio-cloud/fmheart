@@ -3,6 +3,7 @@ import {
   Abhaya_Libre,
   Gemunu_Libre,
   Noto_Sans_Sinhala,
+  Oswald,
   Poppins,
   Yaldevi,
 } from "next/font/google";
@@ -46,6 +47,14 @@ const poppins = Poppins({
   variable: "--font-poppins",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+/** Hero English — Oswald Medium (500). */
+const oswald = Oswald({
+  variable: "--font-oswald",
+  subsets: ["latin"],
+  weight: ["500"],
   display: "swap",
 });
 
@@ -132,7 +141,7 @@ export default function RootLayout({
   return (
     <html
       lang="si"
-      className={`${notoSansSinhala.variable} ${gemunuLibre.variable} ${abhayaLibre.variable} ${yaldevi.variable} ${poppins.variable} h-full`}
+      className={`${notoSansSinhala.variable} ${gemunuLibre.variable} ${abhayaLibre.variable} ${yaldevi.variable} ${poppins.variable} ${oswald.variable} h-full`}
     >
       <head>
         <AdSenseScript />
