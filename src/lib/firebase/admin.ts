@@ -19,17 +19,22 @@ function loadServiceAccount():
   | null {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim();
   if (raw) {
-    const parsed = JSON.parse(raw) as {
-      project_id?: string;
-      client_email?: string;
-      private_key?: string;
-    };
-    if (!parsed.client_email || !parsed.private_key) return null;
-    return {
-      projectId: parsed.project_id,
-      clientEmail: parsed.client_email,
-      privateKey: parsed.private_key.replace(/\\n/g, "\n"),
-    };
+    try {
+      const parsed = JSON.parse(raw) as {
+        project_id?: string;
+        client_email?: string;
+        private_key?: string;
+      };
+      if (!parsed.client_email || !parsed.private_key) return null;
+      return {
+        projectId: parsed.project_id,
+        clientEmail: parsed.client_email,
+        privateKey: parsed.private_key.replace(/\\n/g, "\n"),
+      };
+    } catch {
+      console.error("[firebase/admin] FIREBASE_SERVICE_ACCOUNT_JSON is invalid JSON");
+      return null;
+    }
   }
 
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();

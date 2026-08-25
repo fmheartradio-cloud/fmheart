@@ -1,12 +1,17 @@
+import type { Sharp } from "sharp";
+
 const FETCH_TIMEOUT_MS = 12000;
 const MAX_ANALYZE_WIDTH = 720;
 
-type SharpFn = typeof import("sharp").default;
+type SharpFn = (input?: Buffer | Uint8Array | string) => Sharp;
 
 async function getSharp(): Promise<SharpFn | null> {
   try {
-    const mod = await import("sharp");
-    return mod.default;
+    const mod = (await import("sharp")) as unknown as {
+      default?: SharpFn;
+    } & SharpFn;
+    const fn = typeof mod.default === "function" ? mod.default : mod;
+    return typeof fn === "function" ? fn : null;
   } catch (err) {
     console.warn("[watermark-detect] sharp unavailable:", err);
     return null;
