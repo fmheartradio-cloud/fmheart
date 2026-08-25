@@ -1,6 +1,5 @@
 import { after, NextResponse } from "next/server";
 import { isAdminSdkConfigured } from "@/lib/firebase/admin";
-import { runNewsIngest } from "@/lib/newsbot/ingest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +31,9 @@ async function handle(req: Request) {
   // cron-job.org (~30s timeout): /api/cron/newsbot?async=1
   // GitHub Actions / manual: default sync (waits for full ingest)
   const asyncMode = url.searchParams.get("async") === "1";
+
+  // Lazy-load ingest (and sharp) so auth/config failures return JSON, not a hard crash.
+  const { runNewsIngest } = await import("@/lib/newsbot/ingest");
 
   if (asyncMode) {
     const startedAt = new Date().toISOString();

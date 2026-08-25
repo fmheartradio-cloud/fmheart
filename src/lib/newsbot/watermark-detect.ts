@@ -1,7 +1,17 @@
-import sharp from "sharp";
-
 const FETCH_TIMEOUT_MS = 12000;
 const MAX_ANALYZE_WIDTH = 720;
+
+type SharpFn = typeof import("sharp").default;
+
+async function getSharp(): Promise<SharpFn | null> {
+  try {
+    const mod = await import("sharp");
+    return mod.default;
+  } catch (err) {
+    console.warn("[watermark-detect] sharp unavailable:", err);
+    return null;
+  }
+}
 
 /** Ada Derana burns a 3-language boxed logo (usually bottom-left). */
 function isAdaFamilyCoverUrl(url: string): boolean {
@@ -14,6 +24,7 @@ function isRedBorderPixel(r: number, g: number, b: number): boolean {
 }
 
 async function redRatioInRegion(
+  sharp: SharpFn,
   input: Buffer,
   left: number,
   top: number,
@@ -43,38 +54,44 @@ export async function detectAdaDeranaWatermark(
   image: Buffer,
 ): Promise<boolean> {
   if (!image?.length) return false;
+  const sharp = await getSharp();
+  if (!sharp) return false;
 
-  const resized = await sharp(image)
-    .rotate()
-    .resize({
-      width: MAX_ANALYZE_WIDTH,
-      withoutEnlargement: true,
-    })
-    .jpeg({ quality: 85 })
-    .toBuffer();
+  try {
+    const resized = await sharp(image)
+      .rotate()
+      .resize({
+        width: MAX_ANALYZE_WIDTH,
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 85 })
+      .toBuffer();
 
-  const meta = await sharp(resized).metadata();
-  const w = meta.width || 0;
-  const h = meta.height || 0;
-  if (w < 80 || h < 80) return false;
+    const meta = await sharp(resized).metadata();
+    const w = meta.width || 0;
+    const h = meta.height || 0;
+    if (w < 80 || h < 80) return false;
 
-  const rw = Math.max(24, Math.floor(w * 0.42));
-  const rh = Math.max(20, Math.floor(h * 0.3));
+    const rw = Math.max(24, Math.floor(w * 0.42));
+    const rh = Math.max(20, Math.floor(h * 0.3));
 
-  const [bl, br, tl] = await Promise.all([
-    redRatioInRegion(resized, 0, h - rh, rw, rh),
-    redRatioInRegion(resized, w - rw, h - rh, rw, rh),
-    redRatioInRegion(resized, 0, 0, rw, rh),
-  ]);
+    const [bl, br, tl] = await Promise.all([
+      redRatioInRegion(sharp, resized, 0, h - rh, rw, rh),
+      redRatioInRegion(sharp, resized, w - rw, h - rh, rw, rh),
+      redRatioInRegion(sharp, resized, 0, 0, rw, rh),
+    ]);
 
-  // Watermark sits bottom-left more often than other corners.
-  const cornerHit =
-    bl >= 0.055 && bl >= br * 1.1 && bl >= tl * 0.95;
+    // Watermark sits bottom-left more often than other corners.
+    const cornerHit = bl >= 0.055 && bl >= br * 1.1 && bl >= tl * 0.95;
 
-  // Sometimes centered along bottom — accept high red in either bottom corner.
-  const bottomHit = Math.max(bl, br) >= 0.09 && Math.max(bl, br) >= tl * 1.2;
+    // Sometimes centered along bottom — accept high red in either bottom corner.
+    const bottomHit = Math.max(bl, br) >= 0.09 && Math.max(bl, br) >= tl * 1.2;
 
-  return cornerHit || bottomHit;
+    return cornerHit || bottomHit;
+  } catch (err) {
+    console.warn("[watermark-detect] Ada detect failed:", err);
+    return false;
+  }
 }
 
 export async function fetchCoverHasAdaDeranaWatermark(
@@ -168,59 +185,66 @@ export async function detectNethDesignedVideoPoster(
   image: Buffer,
 ): Promise<boolean> {
   if (!image?.length) return false;
+  const sharp = await getSharp();
+  if (!sharp) return false;
 
-  const { data, info } = await sharp(image)
-    .rotate()
-    .resize({
-      width: MAX_ANALYZE_WIDTH,
-      withoutEnlargement: true,
-    })
-    .removeAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
+  try {
+    const { data, info } = await sharp(image)
+      .rotate()
+      .resize({
+        width: MAX_ANALYZE_WIDTH,
+        withoutEnlargement: true,
+      })
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
 
-  const w = info.width || 0;
-  const h = info.height || 0;
-  const ch = info.channels || 3;
-  if (w < 80 || h < 80) return false;
+    const w = info.width || 0;
+    const h = info.height || 0;
+    const ch = info.channels || 3;
+    if (w < 80 || h < 80) return false;
 
-  const tr = regionChannelStats(
-    data,
-    w,
-    ch,
-    Math.floor(w * 0.68),
-    0,
-    Math.floor(w * 0.3),
-    Math.floor(h * 0.2),
-  );
-  const lower = regionChannelStats(
-    data,
-    w,
-    ch,
-    Math.floor(w * 0.05),
-    Math.floor(h * 0.55),
-    Math.floor(w * 0.9),
-    Math.floor(h * 0.4),
-  );
-  const brTiny = regionChannelStats(
-    data,
-    w,
-    ch,
-    Math.floor(w * 0.82),
-    Math.floor(h * 0.86),
-    Math.floor(w * 0.16),
-    Math.floor(h * 0.12),
-  );
+    const tr = regionChannelStats(
+      data,
+      w,
+      ch,
+      Math.floor(w * 0.68),
+      0,
+      Math.floor(w * 0.3),
+      Math.floor(h * 0.2),
+    );
+    const lower = regionChannelStats(
+      data,
+      w,
+      ch,
+      Math.floor(w * 0.05),
+      Math.floor(h * 0.55),
+      Math.floor(w * 0.9),
+      Math.floor(h * 0.4),
+    );
+    const brTiny = regionChannelStats(
+      data,
+      w,
+      ch,
+      Math.floor(w * 0.82),
+      Math.floor(h * 0.86),
+      Math.floor(w * 0.16),
+      Math.floor(h * 0.12),
+    );
 
-  const netNewsBadge = tr.redRatio >= 0.1;
-  const lowerGraphicText = lower.redRatio >= 0.12 && lower.brightRatio >= 0.08;
-  const durationPill = brTiny.darkRatio >= 0.25 && brTiny.brightRatio >= 0.03;
+    const netNewsBadge = tr.redRatio >= 0.1;
+    const lowerGraphicText = lower.redRatio >= 0.12 && lower.brightRatio >= 0.08;
+    const durationPill = brTiny.darkRatio >= 0.25 && brTiny.brightRatio >= 0.03;
 
-  return (
-    (netNewsBadge && lowerGraphicText) ||
-    (netNewsBadge && durationPill) ||
-    (lowerGraphicText && durationPill)
-  );
+    return (
+      (netNewsBadge && lowerGraphicText) ||
+      (netNewsBadge && durationPill) ||
+      (lowerGraphicText && durationPill)
+    );
+  } catch (err) {
+    console.warn("[watermark-detect] Neth poster detect failed:", err);
+    return false;
+  }
 }
 
 export async function fetchCoverIsNethDesignedVideoPoster(

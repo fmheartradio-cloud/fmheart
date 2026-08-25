@@ -24,7 +24,7 @@ jobs:
           code=$(curl -sS -o /tmp/out.json -w "%{http_code}" \
             -X POST \
             -H "Authorization: Bearer ${CRON_SECRET}" \
-            "https://fmheart-tau.vercel.app/api/cron/newsbot")
+            "https://www.fmheart.lk/api/cron/newsbot")
           echo "HTTP ${code}"
           cat /tmp/out.json
           echo
