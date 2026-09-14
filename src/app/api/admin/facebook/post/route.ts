@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { isAdminEmail } from "@/lib/admin";
-import { getAdminDb } from "@/lib/firebase/admin";
-import { verifyFirebaseIdToken } from "@/lib/firebase/verify-id-token";
+import { requireAdmin } from "@/lib/admin-session";
+import { getAdminDb } from "@/lib/db/compat";
 import {
   isFacebookAutoPostConfigured,
   postArticleToFacebookPage,
@@ -14,45 +13,9 @@ type Body = {
   force?: boolean;
 };
 
-async function requireAdmin(request: Request) {
-  const authHeader = request.headers.get("authorization") || "";
-  const token = authHeader.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length).trim()
-    : "";
-  if (!token) {
-    return {
-      error: NextResponse.json(
-        { error: "Unauthorized — admin login required" },
-        { status: 401 },
-      ),
-    };
-  }
-
-  const decoded = await verifyFirebaseIdToken(token);
-  if (!decoded) {
-    return {
-      error: NextResponse.json(
-        { error: "Forbidden — invalid or expired admin session. Sign out and sign in again." },
-        { status: 403 },
-      ),
-    };
-  }
-  if (!isAdminEmail(decoded.email)) {
-    return {
-      error: NextResponse.json(
-        {
-          error: `Forbidden — ${decoded.email || "this account"} is not an admin email`,
-        },
-        { status: 403 },
-      ),
-    };
-  }
-  return { email: decoded.email };
-}
-
 export async function POST(request: Request) {
   const auth = await requireAdmin(request);
-  if ("error" in auth && auth.error) return auth.error;
+  if ("error" in auth) return auth.error;
 
   if (!isFacebookAutoPostConfigured()) {
     return NextResponse.json(
@@ -67,7 +30,7 @@ export async function POST(request: Request) {
   const db = getAdminDb();
   if (!db) {
     return NextResponse.json(
-      { error: "Admin SDK not configured" },
+      { error: "Turso not configured" },
       { status: 503 },
     );
   }

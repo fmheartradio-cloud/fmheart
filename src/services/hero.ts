@@ -1,14 +1,13 @@
-import { heroSlides as mockSlides } from "@/data/mock";
+import { cmsFetch } from "@/lib/cms-fetch";
 import { formatSriLankaDateTime } from "@/lib/datetime";
-import { isFirebaseConfigured } from "@/lib/firebase/client";
-import { finalizeCoverUrl, upgradeImageUrl } from "@/lib/image-url";
+import { getAdminDb } from "@/lib/db/compat";
+import { finalizeCoverUrl } from "@/lib/image-url";
 import { toHeroExcerpt, toPlainText } from "@/lib/plain-text";
 import { listArticles, mapFirebaseError } from "@/services/articles";
 import type { Article } from "@/types";
 import type { CmsArticle } from "@/types/cms";
 
 const HERO_NEWS_LIMIT = 10;
-
 const SETTINGS_DOC = "hero";
 
 export type HeroSlideInput = {
@@ -18,12 +17,6 @@ export type HeroSlideInput = {
   image: string;
   slug: string;
 };
-
-async function tryFirestore() {
-  if (!isFirebaseConfigured()) return null;
-  const { getDb } = await import("@/lib/firebase/client");
-  return getDb();
-}
 
 function normalizeSlides(raw: unknown): Article[] {
   if (!Array.isArray(raw)) return [];
@@ -56,7 +49,6 @@ function normalizeSlides(raw: unknown): Article[] {
   return out;
 }
 
-/** Map a published news article to a homepage hero slide. */
 export function cmsToHeroSlide(article: CmsArticle): Article {
   const excerpt = toHeroExcerpt(article.excerpt, article.body, 280);
   return {
@@ -73,7 +65,6 @@ export function cmsToHeroSlide(article: CmsArticle): Article {
   };
 }
 
-/** Homepage hero — 10 newest published news (Sinhala filter via listArticles). */
 export async function getLatestNewsHeroSlides(): Promise<Article[]> {
   try {
     const articles = await listArticles({
@@ -81,45 +72,51 @@ export async function getLatestNewsHeroSlides(): Promise<Article[]> {
       status: "published",
       limit: HERO_NEWS_LIMIT,
     });
-    if (articles.length === 0) return mockSlides;
     return articles.map(cmsToHeroSlide);
   } catch (err) {
     console.warn("[hero] latest news read failed:", err);
-    return mockSlides;
+    return [];
   }
 }
 
-/** Admin CMS read — Firestore settings/hero (homepage ignores this). */
 export async function getCmsHeroSlides(): Promise<Article[]> {
+  if (typeof window !== "undefined") {
+    const data = await cmsFetch<{ slides: Article[] }>(
+      "/api/admin/settings?key=hero",
+    );
+    return data.slides || [];
+  }
   try {
-    const db = await tryFirestore();
-    if (!db) return mockSlides;
-
-    const { doc, getDoc } = await import("firebase/firestore");
-    const snap = await getDoc(doc(db, "settings", SETTINGS_DOC));
-    if (!snap.exists()) return mockSlides;
-
-    const slides = normalizeSlides(snap.data()?.slides);
-    return slides.length > 0 ? slides : mockSlides;
+    const db = getAdminDb();
+    if (!db) return [];
+    const snap = await db.collection("settings").doc(SETTINGS_DOC).get();
+    if (!snap.exists) return [];
+    return normalizeSlides(snap.data()?.slides);
   } catch (err) {
     console.warn("[hero] CMS read failed:", err);
-    return mockSlides;
+    return [];
   }
 }
 
-/** @deprecated Use getLatestNewsHeroSlides (public) or getCmsHeroSlides (admin). */
 export async function getHeroSlides(): Promise<Article[]> {
   return getLatestNewsHeroSlides();
 }
 
-/** Admin write — requires signed-in admin */
 export async function saveHeroSlides(
   slides: HeroSlideInput[],
 ): Promise<Article[]> {
-  const db = await tryFirestore();
+  if (typeof window !== "undefined") {
+    const data = await cmsFetch<{ slides: Article[] }>("/api/admin/settings", {
+      method: "PUT",
+      body: JSON.stringify({ key: "hero", slides }),
+    });
+    return data.slides || [];
+  }
+
+  const db = getAdminDb();
   if (!db) {
     throw new Error(
-      "Firebase configured නැහැ. .env.local එකේ Firebase keys දාන්න.",
+      "Turso configured නැහැ. TURSO_DATABASE_URL සහ TURSO_AUTH_TOKEN දාන්න.",
     );
   }
 
@@ -140,9 +137,7 @@ export async function saveHeroSlides(
   }
 
   try {
-    const { doc, setDoc } = await import("firebase/firestore");
-    await setDoc(
-      doc(db, "settings", SETTINGS_DOC),
+    await db.collection("settings").doc(SETTINGS_DOC).set(
       {
         slides: cleaned,
         updatedAt: new Date().toISOString(),

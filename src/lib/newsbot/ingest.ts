@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { getAdminDb } from "@/lib/firebase/admin";
+import { getAdminDb } from "@/lib/db/compat";
 import {
   type NewsbotBlockReason,
   sourceUrlKey,
@@ -1679,7 +1679,7 @@ export async function runNewsIngest(options?: {
   const db = getAdminDb();
   if (!db) {
     throw new Error(
-      "Firebase Admin not configured. Set FIREBASE_SERVICE_ACCOUNT_JSON on Vercel.",
+      "Turso not configured. Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN on Vercel.",
     );
   }
   const adminDb = db;

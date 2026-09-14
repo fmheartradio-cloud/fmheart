@@ -18,7 +18,6 @@ export function AdminAuthGate({ children }: { children: ReactNode }) {
     setEmail,
     setPassword,
     handleLogin,
-    handleGoogleLogin,
   } = useAdminAuth();
 
   if (!configured) {
@@ -26,19 +25,34 @@ export function AdminAuthGate({ children }: { children: ReactNode }) {
       <div className="mx-auto max-w-2xl px-4 py-16">
         <h1 className="font-heading text-3xl font-extrabold">CMS Setup</h1>
         <p className="mt-3 text-fh-muted">
-          Firebase config තවම `.env.local` එකේ නැහැ. Admin:{" "}
+          Firebase ඉවත් කරලා <strong>Turso</strong> (free, credit card නැහැ)
+          පාවිච්චි කරනවා. Admin:{" "}
           <code className="text-fh-red">{PRIMARY_ADMIN_EMAIL}</code>
         </p>
         <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm">
           <li>
-            Firebase project එක <strong>{PRIMARY_ADMIN_EMAIL}</strong> එකෙන්
-            create / own කරන්න
+            <a
+              href="https://turso.tech"
+              target="_blank"
+              rel="noreferrer"
+              className="text-fh-red hover:underline"
+            >
+              turso.tech
+            </a>{" "}
+            → GitHub එකෙන් signup (card එකක් අහන්නේ නැහැ)
           </li>
-          <li>Authentication → Google + Email/Password enable කරන්න</li>
-          <li>Web app config → `.env.local`</li>
+          <li>Database එකක් create කරන්න — name: <code>fmheart</code></li>
           <li>
-            <code>npx firebase deploy --only firestore:rules,storage</code>
+            URL + token copy කරලා Vercel + <code>.env.local</code> එකට දාන්න:
+            <div className="mt-1 font-mono text-xs">
+              TURSO_DATABASE_URL
+              <br />
+              TURSO_AUTH_TOKEN
+              <br />
+              ADMIN_PASSWORD
+            </div>
           </li>
+          <li>Redeploy කරලා මේ page එක refresh කරන්න</li>
         </ol>
         <Link href="/" className="mt-6 inline-block text-fh-red hover:underline">
           ← Homepage
@@ -56,23 +70,7 @@ export function AdminAuthGate({ children }: { children: ReactNode }) {
           <span className="text-fh-ink">{PRIMARY_ADMIN_EMAIL}</span>
         </p>
 
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void handleGoogleLogin()}
-          className="mt-6 flex w-full items-center justify-center gap-2 border border-neutral-300 bg-white py-3 font-heading text-sm font-bold transition hover:bg-fh-surface disabled:opacity-60"
-        >
-          <span aria-hidden>G</span>
-          Continue with Google
-        </button>
-
-        <div className="my-5 flex items-center gap-3 text-xs text-fh-muted">
-          <span className="h-px flex-1 bg-neutral-200" />
-          or email / password
-          <span className="h-px flex-1 bg-neutral-200" />
-        </div>
-
-        <form onSubmit={handleLogin} className="space-y-3">
+        <form onSubmit={handleLogin} className="mt-6 space-y-3">
           <input
             type="email"
             required
@@ -84,7 +82,7 @@ export function AdminAuthGate({ children }: { children: ReactNode }) {
           <input
             type="password"
             required
-            placeholder="Password"
+            placeholder="ADMIN_PASSWORD"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-fh-red"

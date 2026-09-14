@@ -9,7 +9,6 @@ import { MostRead } from "@/components/home/MostRead";
 import { NewsGrid, type NewsCard } from "@/components/home/NewsGrid";
 import { VideosSection } from "@/components/home/VideosSection";
 import { AdSenseUnit } from "@/components/ads/AdSenseUnit";
-import { videos as mockVideos } from "@/data/mock";
 import { adSlot } from "@/lib/ads";
 import type { Article, VideoItem } from "@/types";
 
@@ -152,9 +151,9 @@ export function LiveHomeFeed({
             viewAllHref="/gossip"
           />
 
-          <VideosSection
-            videos={feed.videos.length > 0 ? feed.videos : mockVideos}
-          />
+          {feed.videos.length > 0 ? (
+            <VideosSection videos={feed.videos} />
+          ) : null}
 
           <CategoryIcons />
         </div>

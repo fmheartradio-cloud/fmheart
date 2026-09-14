@@ -120,6 +120,11 @@ export default async function NewsPage({
           className="mt-6 min-h-[90px]"
         />
 
+        {articles.length === 0 ? (
+          <p className="mt-8 text-sm text-fh-muted">
+            දැනට පෙන්වන්න පුවත් නැහැ. Newsbot එක update වුණාම මෙතනට එනවා.
+          </p>
+        ) : (
         <div className="mt-8 grid w-full grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
           {articles.map((article) => (
             <article key={article.id} className="group min-w-0">
@@ -142,6 +147,7 @@ export default async function NewsPage({
             </article>
           ))}
         </div>
+        )}
       </main>
       <Footer />
       <MobileBottomNav />

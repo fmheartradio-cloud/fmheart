@@ -1,22 +1,15 @@
-import { breakingHeadlines as mockHeadlines, latestNews } from "@/data/mock";
-import { isFirebaseConfigured } from "@/lib/firebase/client";
+import { cmsFetch } from "@/lib/cms-fetch";
+import { getAdminDb } from "@/lib/db/compat";
 import { listArticles, mapFirebaseError } from "@/services/articles";
 import type { CmsArticle } from "@/types/cms";
 
 const BREAKING_NEWS_LIMIT = 10;
-
 const SETTINGS_DOC = "breaking";
 
 export type BreakingItem = {
   title: string;
   href: string;
 };
-
-async function tryFirestore() {
-  if (!isFirebaseConfigured()) return null;
-  const { getDb } = await import("@/lib/firebase/client");
-  return getDb();
-}
 
 function normalizeHeadlines(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
@@ -25,16 +18,6 @@ function normalizeHeadlines(raw: unknown): string[] {
     .filter(Boolean);
 }
 
-function mockBreakingItems(): BreakingItem[] {
-  return mockHeadlines.map((title, i) => ({
-    title,
-    href: latestNews[i]?.slug
-      ? `/news/${encodeURIComponent(latestNews[i]!.slug)}`
-      : "#",
-  }));
-}
-
-/** Map a published news article to a breaking ticker item. */
 export function cmsToBreakingItem(article: CmsArticle): BreakingItem {
   return {
     title: article.title,
@@ -42,7 +25,6 @@ export function cmsToBreakingItem(article: CmsArticle): BreakingItem {
   };
 }
 
-/** Public ticker — 10 newest published news (Sinhala filter via listArticles). */
 export async function getLatestNewsBreakingItems(): Promise<BreakingItem[]> {
   try {
     const articles = await listArticles({
@@ -50,46 +32,52 @@ export async function getLatestNewsBreakingItems(): Promise<BreakingItem[]> {
       status: "published",
       limit: BREAKING_NEWS_LIMIT,
     });
-    if (articles.length === 0) return mockBreakingItems();
     return articles.map(cmsToBreakingItem);
   } catch (err) {
     console.warn("[breaking] latest news read failed:", err);
-    return mockBreakingItems();
+    return [];
   }
 }
 
-/** Admin CMS read — Firestore settings/breaking (homepage ignores this). */
 export async function getCmsBreakingHeadlines(): Promise<string[]> {
+  if (typeof window !== "undefined") {
+    const data = await cmsFetch<{ headlines: string[] }>(
+      "/api/admin/settings?key=breaking",
+    );
+    return data.headlines || [];
+  }
   try {
-    const db = await tryFirestore();
-    if (!db) return mockHeadlines;
-
-    const { doc, getDoc } = await import("firebase/firestore");
-    const snap = await getDoc(doc(db, "settings", SETTINGS_DOC));
-    if (!snap.exists()) return mockHeadlines;
-
-    const headlines = normalizeHeadlines(snap.data()?.headlines);
-    return headlines.length > 0 ? headlines : mockHeadlines;
+    const db = getAdminDb();
+    if (!db) return [];
+    const snap = await db.collection("settings").doc(SETTINGS_DOC).get();
+    if (!snap.exists) return [];
+    return normalizeHeadlines(snap.data()?.headlines);
   } catch (err) {
     console.warn("[breaking] CMS read failed:", err);
-    return mockHeadlines;
+    return [];
   }
 }
 
-/** @deprecated Use getLatestNewsBreakingItems (public) or getCmsBreakingHeadlines (admin). */
 export async function getBreakingHeadlines(): Promise<string[]> {
   const items = await getLatestNewsBreakingItems();
   return items.map((item) => item.title);
 }
 
-/** Admin write — requires signed-in admin */
 export async function saveBreakingHeadlines(
   headlines: string[],
 ): Promise<string[]> {
-  const db = await tryFirestore();
+  if (typeof window !== "undefined") {
+    const data = await cmsFetch<{ headlines: string[] }>("/api/admin/settings", {
+      method: "PUT",
+      body: JSON.stringify({ key: "breaking", headlines }),
+    });
+    return data.headlines || [];
+  }
+
+  const db = getAdminDb();
   if (!db) {
     throw new Error(
-      "Firebase configured නැහැ. .env.local එකේ Firebase keys දාන්න.",
+      "Turso configured නැහැ. TURSO_DATABASE_URL සහ TURSO_AUTH_TOKEN දාන්න.",
     );
   }
 
@@ -99,9 +87,7 @@ export async function saveBreakingHeadlines(
   }
 
   try {
-    const { doc, setDoc } = await import("firebase/firestore");
-    await setDoc(
-      doc(db, "settings", SETTINGS_DOC),
+    await db.collection("settings").doc(SETTINGS_DOC).set(
       {
         headlines: cleaned,
         updatedAt: new Date().toISOString(),

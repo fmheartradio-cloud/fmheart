@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { MixedScriptText } from "@/components/ui/MixedScriptText";
-import { heroSlides as mockSlides } from "@/data/mock";
 import type { Article } from "@/types";
 
 type HeroSliderProps = {
@@ -12,8 +11,7 @@ type HeroSliderProps = {
 };
 
 export function HeroSlider({ slides: initialSlides }: HeroSliderProps) {
-  const slides =
-    initialSlides && initialSlides.length > 0 ? initialSlides : mockSlides;
+  const slides = initialSlides && initialSlides.length > 0 ? initialSlides : [];
   const [index, setIndex] = useState(0);
   const slide = slides[index] ?? slides[0];
   const slideKey = slides.map((s) => s.id).join(",");
@@ -30,7 +28,15 @@ export function HeroSlider({ slides: initialSlides }: HeroSliderProps) {
     return () => clearInterval(id);
   }, [slides.length, slideKey]);
 
-  if (!slide) return null;
+  if (!slide) {
+    return (
+      <section className="relative flex min-h-[280px] w-full items-end bg-fh-black p-4 md:min-h-[420px] md:p-8 lg:min-h-[480px]">
+        <h1 className="font-hero max-w-3xl text-2xl leading-snug text-white md:text-4xl">
+          FM Heart — යෞවනයේ හද ගැහෙන රිද්මය
+        </h1>
+      </section>
+    );
+  }
 
   return (
     <section className="relative min-h-[280px] w-full max-w-full min-w-0 overflow-hidden bg-fh-black md:min-h-[420px] lg:min-h-[480px]">

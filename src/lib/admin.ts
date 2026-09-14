@@ -1,4 +1,4 @@
-/** CMS / Firestore admin allowlist */
+/** CMS admin email allowlist */
 const DEFAULT_ADMINS = [
   "fmheartradio@gmail.com",
   "narada.pathum@gmail.com",

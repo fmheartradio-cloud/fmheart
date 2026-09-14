@@ -4,21 +4,20 @@ Modern Sinhala-first media website for **FM Heart** (`fmheart.lk`).
 
 ## Stack
 
-- Next.js 16 · React 19 · Tailwind CSS 4 · Firebase (Auth + Firestore)
+- Next.js 16 · React 19 · Tailwind CSS 4 · Turso (SQLite)
 - Hosting: **Vercel** (Singapore `sin1`)
 - Live stream: `https://cast3.my-control-panel.com/proxy/fmheartn/stream`
 - Fonts: Gemunu Libre · Abhaya Libre · Noto Sans Sinhala · Yaldevi
 
 ## Fresh accounts (recommended)
 
-අලුත් Google + Firebase + Vercel accounts වලින් setup කරන්න:
+Turso (free, no credit card) + Vercel:
 
 👉 See **[SETUP-ACCOUNTS.md](./SETUP-ACCOUNTS.md)**
 
 ```bash
 npm install
-cp .env.example .env.local
-# Fill Firebase web config from NEW project
+# Set TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, ADMIN_PASSWORD in .env.local
 npm run dev
 ```
 
@@ -30,7 +29,7 @@ npm run dev
 | `/live` | Full live radio player |
 | `/news`, `/news/[slug]` | News |
 | `/gossip`, `/gossip/[slug]` | Gossip |
-| `/admin` | CMS (Firebase Auth) |
+| `/admin` | CMS (email + ADMIN_PASSWORD) |
 | `/sitemap.xml` | SEO sitemap |
 | `/rss.xml` | RSS feed |
 

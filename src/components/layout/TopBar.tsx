@@ -2,29 +2,37 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { breakingHeadlines as mockHeadlines, latestNews } from "@/data/mock";
 import { MixedScriptText } from "@/components/ui/MixedScriptText";
-import {
-  getLatestNewsBreakingItems,
-  type BreakingItem,
-} from "@/services/breaking";
+import type { BreakingItem } from "@/services/breaking";
 import { SITE } from "@/lib/site";
 
-const mockItems: BreakingItem[] = mockHeadlines.map((title, i) => ({
-  title,
-  href: latestNews[i]?.slug
-    ? `/news/${encodeURIComponent(latestNews[i]!.slug)}`
-    : "#",
-}));
+const fallbackItems: BreakingItem[] = [
+  { title: "FM Heart Live News", href: "/news" },
+];
 
 export function TopBar() {
-  const [items, setItems] = useState<BreakingItem[]>(mockItems);
+  const [items, setItems] = useState<BreakingItem[]>(fallbackItems);
 
   useEffect(() => {
     let cancelled = false;
-    void getLatestNewsBreakingItems().then((headlines) => {
-      if (!cancelled && headlines.length > 0) setItems(headlines);
-    });
+    void fetch("/api/news/home", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then(
+        (data: {
+          news?: Array<{ title: string; href?: string; slug?: string }>;
+        } | null) => {
+          if (cancelled || !data?.news?.length) return;
+          setItems(
+            data.news.slice(0, 10).map((a) => ({
+              title: a.title,
+              href: a.href || `/news/${encodeURIComponent(a.slug || "")}`,
+            })),
+          );
+        },
+      )
+      .catch(() => {
+        /* keep fallback */
+      });
     return () => {
       cancelled = true;
     };

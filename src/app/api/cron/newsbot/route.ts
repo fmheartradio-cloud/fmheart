@@ -1,5 +1,5 @@
 import { after, NextResponse } from "next/server";
-import { isAdminSdkConfigured } from "@/lib/firebase/admin";
+import { isAdminSdkConfigured } from "@/lib/db/compat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ async function handle(req: Request) {
       {
         ok: false,
         error:
-          "FIREBASE_SERVICE_ACCOUNT_JSON missing. Add it in Vercel Environment Variables.",
+          "Turso not configured. Add TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in Vercel Environment Variables.",
       },
       { status: 503 },
     );

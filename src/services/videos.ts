@@ -1,5 +1,6 @@
 import { videos as mockVideos } from "@/data/mock";
-import { isFirebaseConfigured } from "@/lib/firebase/client";
+import { cmsFetch } from "@/lib/cms-fetch";
+import { getAdminDb, isDbConfigured } from "@/lib/db/compat";
 import { mapFirebaseError } from "@/services/articles";
 import type { VideoItem } from "@/types";
 
@@ -15,12 +16,6 @@ export type VideoInput = {
   slug?: string;
   videoUrl?: string;
 };
-
-async function tryFirestore() {
-  if (!isFirebaseConfigured()) return null;
-  const { getDb } = await import("@/lib/firebase/client");
-  return getDb();
-}
 
 function slugify(text: string): string {
   const ascii = text
@@ -63,8 +58,7 @@ export function normalizeVideos(raw: unknown): VideoItem[] {
       const r = row as Record<string, unknown>;
       const title = typeof r.title === "string" ? r.title.trim() : "";
       if (!title) return null;
-      const videoUrl =
-        typeof r.videoUrl === "string" ? r.videoUrl.trim() : "";
+      const videoUrl = typeof r.videoUrl === "string" ? r.videoUrl.trim() : "";
       const thumbnailRaw =
         typeof r.thumbnail === "string" ? r.thumbnail.trim() : "";
       const thumbnail =
@@ -100,46 +94,57 @@ export function normalizeVideos(raw: unknown): VideoItem[] {
     .filter((v): v is VideoItem => Boolean(v));
 }
 
-/** Public homepage /videos — CMS list, else mock. */
+async function readVideos(): Promise<VideoItem[] | null> {
+  const db = getAdminDb();
+  if (!db) return null;
+  const snap = await db.collection("settings").doc(SETTINGS_DOC).get();
+  if (!snap.exists) return [];
+  return normalizeVideos(snap.data()?.items);
+}
+
 export async function getPublicVideos(limit = 12): Promise<VideoItem[]> {
   try {
-    const db = await tryFirestore();
-    if (!db) return mockVideos.slice(0, limit);
-
-    const { doc, getDoc } = await import("firebase/firestore");
-    const snap = await getDoc(doc(db, "settings", SETTINGS_DOC));
-    if (!snap.exists()) return mockVideos.slice(0, limit);
-
-    const items = normalizeVideos(snap.data()?.items);
-    return items.length > 0 ? items.slice(0, limit) : mockVideos.slice(0, limit);
+    const items = await readVideos();
+    if (items === null) {
+      return process.env.NODE_ENV === "production"
+        ? []
+        : mockVideos.slice(0, limit);
+    }
+    return items.length > 0 ? items.slice(0, limit) : [];
   } catch (err) {
     console.warn("[videos] public read failed:", err);
-    return mockVideos.slice(0, limit);
+    return [];
   }
 }
 
-/** Admin CMS read — empty array if none saved (so admin can start fresh). */
 export async function getCmsVideos(): Promise<VideoItem[]> {
+  if (typeof window !== "undefined") {
+    const data = await cmsFetch<{ items: VideoItem[] }>(
+      "/api/admin/settings?key=videos",
+    );
+    return data.items || [];
+  }
   try {
-    const db = await tryFirestore();
-    if (!db) return [];
-
-    const { doc, getDoc } = await import("firebase/firestore");
-    const snap = await getDoc(doc(db, "settings", SETTINGS_DOC));
-    if (!snap.exists()) return [];
-    return normalizeVideos(snap.data()?.items);
+    return (await readVideos()) || [];
   } catch (err) {
     console.warn("[videos] CMS read failed:", err);
     return [];
   }
 }
 
-/** Admin write — requires signed-in admin */
 export async function saveVideos(inputs: VideoInput[]): Promise<VideoItem[]> {
-  const db = await tryFirestore();
+  if (typeof window !== "undefined") {
+    const data = await cmsFetch<{ items: VideoItem[] }>("/api/admin/settings", {
+      method: "PUT",
+      body: JSON.stringify({ key: "videos", items: inputs }),
+    });
+    return data.items || [];
+  }
+
+  const db = getAdminDb();
   if (!db) {
     throw new Error(
-      "Firebase configured නැහැ. .env.local එකේ Firebase keys දාන්න.",
+      "Turso configured නැහැ. TURSO_DATABASE_URL සහ TURSO_AUTH_TOKEN දාන්න.",
     );
   }
 
@@ -157,9 +162,7 @@ export async function saveVideos(inputs: VideoInput[]): Promise<VideoItem[]> {
   );
 
   try {
-    const { doc, setDoc } = await import("firebase/firestore");
-    await setDoc(
-      doc(db, "settings", SETTINGS_DOC),
+    await db.collection("settings").doc(SETTINGS_DOC).set(
       {
         items: cleaned,
         updatedAt: new Date().toISOString(),

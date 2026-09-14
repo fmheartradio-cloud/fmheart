@@ -1,12 +1,46 @@
 import { NextResponse } from "next/server";
-import { isAdminEmail } from "@/lib/admin";
-import { getAdminDb } from "@/lib/firebase/admin";
-import { verifyFirebaseIdToken } from "@/lib/firebase/verify-id-token";
-import { sourceUrlKey } from "@/lib/newsbot/blocklist";
+import { requireAdmin } from "@/lib/admin-session";
+import { deleteArticle, setArticleStatus } from "@/services/articles";
 
 export const runtime = "nodejs";
 
 type RouteContext = { params: Promise<{ id: string }> };
+
+export async function PATCH(request: Request, context: RouteContext) {
+  const auth = await requireAdmin(request);
+  if ("error" in auth) return auth.error;
+
+  const { id } = await context.params;
+  if (!id?.trim()) {
+    return NextResponse.json({ error: "Missing article id" }, { status: 400 });
+  }
+
+  let body: { status?: "draft" | "published" | "archived" };
+  try {
+    body = (await request.json()) as {
+      status?: "draft" | "published" | "archived";
+    };
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  if (
+    body.status !== "draft" &&
+    body.status !== "published" &&
+    body.status !== "archived"
+  ) {
+    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  }
+
+  try {
+    await setArticleStatus(id, body.status);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    );
+  }
+}
 
 export async function DELETE(request: Request, context: RouteContext) {
   const { id } = await context.params;
@@ -14,54 +48,12 @@ export async function DELETE(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Missing article id" }, { status: 400 });
   }
 
-  const authHeader = request.headers.get("authorization") || "";
-  const token = authHeader.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length).trim()
-    : "";
-  if (!token) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const db = getAdminDb();
-  if (!db) {
-    return NextResponse.json(
-      { error: "Admin SDK not configured" },
-      { status: 503 },
-    );
-  }
+  const auth = await requireAdmin(request);
+  if ("error" in auth) return auth.error;
 
   try {
-    const decoded = await verifyFirebaseIdToken(token);
-    if (!decoded || !isAdminEmail(decoded.email)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    const ref = db.collection("articles").doc(id);
-    const snap = await ref.get();
-    if (!snap.exists) {
-      return NextResponse.json({ ok: true, missing: true });
-    }
-
-    const data = snap.data() || {};
-    const sourceUrl = String(data.sourceUrl || "").trim();
-    if (sourceUrl) {
-      await db
-        .collection("newsbot_blocked")
-        .doc(sourceUrlKey(sourceUrl))
-        .set(
-          {
-            sourceUrl,
-            sourceHash: data.sourceHash || null,
-            title: data.title || "",
-            reason: "admin_delete",
-            blockedAt: new Date().toISOString(),
-          },
-          { merge: true },
-        );
-    }
-
-    await ref.delete();
-    return NextResponse.json({ ok: true, blocked: Boolean(sourceUrl) });
+    await deleteArticle(id);
+    return NextResponse.json({ ok: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });

@@ -10,20 +10,13 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import {
-  GoogleAuthProvider,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  signOut,
-  type User,
-} from "firebase/auth";
-import { isAdminEmail, PRIMARY_ADMIN_EMAIL } from "@/lib/admin";
-import { getFirebaseAuth, isFirebaseConfigured } from "@/lib/firebase/client";
+import { PRIMARY_ADMIN_EMAIL } from "@/lib/admin";
+
+type AdminUser = { email: string };
 
 type AdminAuthContextValue = {
   configured: boolean;
-  user: User | null;
+  user: AdminUser | null;
   busy: boolean;
   message: string | null;
   denied: boolean;
@@ -40,8 +33,8 @@ type AdminAuthContextValue = {
 const AdminAuthContext = createContext<AdminAuthContextValue | null>(null);
 
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
-  const configured = isFirebaseConfigured();
-  const [user, setUser] = useState<User | null>(null);
+  const [configured, setConfigured] = useState(true);
+  const [user, setUser] = useState<AdminUser | null>(null);
   const [email, setEmail] = useState(PRIMARY_ADMIN_EMAIL);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -49,36 +42,45 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [denied, setDenied] = useState(false);
 
   useEffect(() => {
-    if (!configured) return;
-    const auth = getFirebaseAuth();
-    if (!auth) return;
-    return onAuthStateChanged(auth, async (next) => {
-      if (next && !isAdminEmail(next.email)) {
-        setDenied(true);
-        setUser(null);
-        await signOut(auth);
-        return;
-      }
-      setDenied(false);
-      setUser(next);
-    });
-  }, [configured]);
+    let cancelled = false;
+    void fetch("/api/admin/session", { credentials: "include" })
+      .then((res) => res.json())
+      .then((data: { configured?: boolean; email?: string | null }) => {
+        if (cancelled) return;
+        setConfigured(Boolean(data.configured));
+        if (data.email) setUser({ email: data.email });
+      })
+      .catch(() => {
+        if (!cancelled) setConfigured(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleLogin = useCallback(
     async (e: FormEvent) => {
       e.preventDefault();
-      const auth = getFirebaseAuth();
-      if (!auth) return;
-      if (!isAdminEmail(email)) {
-        setMessage(
-          `Access තියෙන්නේ admin emails වලට විතරයි (${PRIMARY_ADMIN_EMAIL})`,
-        );
-        return;
-      }
       setBusy(true);
       setMessage(null);
+      setDenied(false);
       try {
-        await signInWithEmailAndPassword(auth, email, password);
+        const res = await fetch("/api/admin/session", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          email?: string;
+          error?: string;
+        };
+        if (!res.ok) {
+          setDenied(res.status === 403);
+          setMessage(data.error || "Login failed");
+          return;
+        }
+        setUser({ email: data.email || email });
       } catch (err) {
         setMessage(err instanceof Error ? err.message : "Login failed");
       } finally {
@@ -89,35 +91,17 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   );
 
   const handleGoogleLogin = useCallback(async () => {
-    const auth = getFirebaseAuth();
-    if (!auth) return;
-    setBusy(true);
-    setMessage(null);
-    setDenied(false);
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({
-        prompt: "select_account",
-        login_hint: PRIMARY_ADMIN_EMAIL,
-      });
-      const result = await signInWithPopup(auth, provider);
-      if (!isAdminEmail(result.user.email)) {
-        await signOut(auth);
-        setDenied(true);
-        setMessage(
-          `${result.user.email} ට access නැහැ. ${PRIMARY_ADMIN_EMAIL} එකෙන් login වෙන්න.`,
-        );
-      }
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Google login failed");
-    } finally {
-      setBusy(false);
-    }
+    setMessage(
+      "Google login දැන් Firebase නැති නිසා වැඩ කරන්නේ නැහැ. Admin email + ADMIN_PASSWORD එකෙන් login වෙන්න.",
+    );
   }, []);
 
   const logout = useCallback(async () => {
-    const auth = getFirebaseAuth();
-    if (auth) await signOut(auth);
+    await fetch("/api/admin/session", {
+      method: "DELETE",
+      credentials: "include",
+    });
+    setUser(null);
   }, []);
 
   const value = useMemo(

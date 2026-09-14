@@ -1,13 +1,13 @@
 import type { CmsArticle, CmsArticleInput } from "@/types/cms";
 import { gossipNews, latestNews } from "@/data/mock";
+import { cmsFetch } from "@/lib/cms-fetch";
 import { formatSriLankaDateTime } from "@/lib/datetime";
-import { isFirebaseConfigured } from "@/lib/firebase/client";
-import { finalizeCoverUrl, upgradeImageUrl } from "@/lib/image-url";
+import { getAdminDb, isDbConfigured } from "@/lib/db/compat";
+import { finalizeCoverUrl } from "@/lib/image-url";
 import { toPlainExcerpt, toPlainText } from "@/lib/plain-text";
 import { hasSinhalaNewsText } from "@/lib/sinhala-script";
 
 function slugify(text: string): string {
-  // Prefer short ASCII slugs. Pure-Sinhala titles → news-{id}
   const ascii = text
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -51,46 +51,10 @@ function normalizeArticleText(article: CmsArticle): CmsArticle {
   };
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(
-        new Error(
-          `${label} timeout (${ms / 1000}s). Firestore Database / rules check කරන්න.`,
-        ),
-      );
-    }, ms);
-    promise.then(
-      (v) => {
-        clearTimeout(timer);
-        resolve(v);
-      },
-      (err) => {
-        clearTimeout(timer);
-        reject(err);
-      },
-    );
-  });
-}
-
 export function mapFirebaseError(err: unknown): string {
-  const code =
-    typeof err === "object" && err && "code" in err
-      ? String((err as { code: string }).code)
-      : "";
   const message = err instanceof Error ? err.message : String(err);
-
-  if (message.includes("timeout") || message.includes("Firestore")) {
+  if (/turso|libsql|database/i.test(message)) {
     return message;
-  }
-  if (code === "permission-denied" || message.includes("permission")) {
-    return "Permission denied — Firebase Console → Firestore → Rules එකට අපේ rules paste කරලා Publish කරන්න.";
-  }
-  if (code === "unavailable" || code === "failed-precondition") {
-    return "Firestore ලබාගත නොහැක. Console එකේ database ready ද බලන්න.";
-  }
-  if (code === "not-found") {
-    return "Firestore database හමු නොවුණා.";
   }
   return message || "Save failed";
 }
@@ -148,7 +112,6 @@ function sortByPublished(items: CmsArticle[]): CmsArticle[] {
   });
 }
 
-/** Hide non-Sinhala news and cover-less / junk-cover news on the public site. */
 function filterPublicNews(items: CmsArticle[], status: string): CmsArticle[] {
   if (status === "all") return items;
   return items.filter((a) => {
@@ -159,13 +122,51 @@ function filterPublicNews(items: CmsArticle[], status: string): CmsArticle[] {
   });
 }
 
-async function tryFirestore() {
-  if (!isFirebaseConfigured()) return null;
-  const { getDb } = await import("@/lib/firebase/client");
-  return getDb();
+function docToArticle(id: string, data: Record<string, unknown>): CmsArticle {
+  return normalizeArticleText({
+    id,
+    type: data.type === "gossip" ? "gossip" : "news",
+    title: String(data.title || ""),
+    slug: String(data.slug || ""),
+    excerpt: String(data.excerpt || ""),
+    body: String(data.body || ""),
+    category: String(data.category || ""),
+    coverImage: String(data.coverImage || ""),
+    author: String(data.author || ""),
+    status:
+      data.status === "draft" || data.status === "archived"
+        ? data.status
+        : "published",
+    tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
+    readingTimeMin: Number(data.readingTimeMin) || 1,
+    views: Number(data.views) || 0,
+    createdAt: String(data.createdAt || ""),
+    updatedAt: String(data.updatedAt || ""),
+    publishedAt: data.publishedAt ? String(data.publishedAt) : null,
+    seoTitle: data.seoTitle ? String(data.seoTitle) : undefined,
+    seoDescription: data.seoDescription
+      ? String(data.seoDescription)
+      : undefined,
+    source: data.source ? String(data.source) : undefined,
+    sourceUrl: data.sourceUrl ? String(data.sourceUrl) : undefined,
+    sourceHash: data.sourceHash ? String(data.sourceHash) : undefined,
+    ingestedBy: data.ingestedBy === "newsbot" ? "newsbot" : "manual",
+    facebookPostId: data.facebookPostId
+      ? String(data.facebookPostId)
+      : undefined,
+    facebookPostUrl: data.facebookPostUrl
+      ? String(data.facebookPostUrl)
+      : undefined,
+    facebookPostedAt: data.facebookPostedAt
+      ? String(data.facebookPostedAt)
+      : undefined,
+    facebookPostError: data.facebookPostError
+      ? String(data.facebookPostError)
+      : undefined,
+  } as CmsArticle);
 }
 
-export async function listArticles(options?: {
+async function listArticlesDb(options?: {
   type?: "news" | "gossip";
   status?: "published" | "draft" | "archived" | "all";
   limit?: number;
@@ -173,50 +174,30 @@ export async function listArticles(options?: {
   const type = options?.type;
   const status = options?.status ?? "published";
   const limitCount = options?.limit ?? 24;
-  const configured = isFirebaseConfigured();
+  const configured = isDbConfigured();
 
   try {
-    const db = await tryFirestore();
+    const db = getAdminDb();
     if (db) {
-      const { collection, getDocs, query, where } = await import(
-        "firebase/firestore"
-      );
+      const snap =
+        status === "all"
+          ? await db.collection("articles").get()
+          : await db
+              .collection("articles")
+              .where("status", "==", status)
+              .get();
 
-      // Public/SSR reads MUST filter by status==published (Firestore rules).
-      // Admin "all" works only when authenticated as admin (browser CMS).
-      let snap;
-      if (status === "all") {
-        snap = await withTimeout(
-          getDocs(collection(db, "articles")),
-          15000,
-          "Firestore read",
-        );
-      } else {
-        snap = await withTimeout(
-          getDocs(
-            query(
-              collection(db, "articles"),
-              where("status", "==", status),
-            ),
-          ),
-          15000,
-          "Firestore read",
-        );
-      }
-
-      let items = snap.docs.map(
-        (d) => normalizeArticleText({ id: d.id, ...d.data() } as CmsArticle),
-      );
+      let items = snap.docs.map((d) => docToArticle(d.id, d.data()));
       if (type) items = items.filter((a) => a.type === type);
       items = filterPublicNews(items, status);
       return sortByPublished(items).slice(0, limitCount);
     }
   } catch (err) {
-    console.warn("[articles] Firestore read failed:", err);
+    console.warn("[articles] Turso read failed:", err);
     if (configured) return [];
   }
 
-  if (configured) return [];
+  if (configured || process.env.NODE_ENV === "production") return [];
 
   let items = mockToCms();
   if (type) items = items.filter((a) => a.type === type);
@@ -225,8 +206,28 @@ export async function listArticles(options?: {
   return sortByPublished(items).slice(0, limitCount);
 }
 
-export async function getArticleBySlug(rawSlug: string): Promise<CmsArticle | null> {
-  const configured = isFirebaseConfigured();
+export async function listArticles(options?: {
+  type?: "news" | "gossip";
+  status?: "published" | "draft" | "archived" | "all";
+  limit?: number;
+}): Promise<CmsArticle[]> {
+  if (typeof window !== "undefined") {
+    const params = new URLSearchParams();
+    if (options?.type) params.set("type", options.type);
+    if (options?.status) params.set("status", options.status);
+    if (options?.limit) params.set("limit", String(options.limit));
+    const data = await cmsFetch<{ articles: CmsArticle[] }>(
+      `/api/admin/articles?${params.toString()}`,
+    );
+    return data.articles || [];
+  }
+  return listArticlesDb(options);
+}
+
+export async function getArticleBySlug(
+  rawSlug: string,
+): Promise<CmsArticle | null> {
+  const configured = isDbConfigured();
   const slug = normalizeSlugParam(rawSlug);
   const slugVariants = Array.from(
     new Set([
@@ -238,53 +239,43 @@ export async function getArticleBySlug(rawSlug: string): Promise<CmsArticle | nu
   );
 
   try {
-    const db = await tryFirestore();
+    const db = getAdminDb();
     if (db) {
-      const { collection, getDocs, limit, query, where } = await import(
-        "firebase/firestore"
-      );
-
       for (const candidate of slugVariants) {
-        const q = query(
-          collection(db, "articles"),
-          where("status", "==", "published"),
-          where("slug", "==", candidate),
-          limit(1),
-        );
-        try {
-          const snap = await withTimeout(getDocs(q), 10000, "Firestore read");
-          if (!snap.empty) {
-            const d = snap.docs[0]!;
-            const article = normalizeArticleText({
-              id: d.id,
-              ...d.data(),
-            } as CmsArticle);
-            if (
-              article.type === "news" &&
-              !hasSinhalaNewsText(article.title, article.excerpt)
-            ) {
-              return null;
-            }
-            return article;
+        const snap = await db
+          .collection("articles")
+          .where("status", "==", "published")
+          .where("slug", "==", candidate)
+          .limit(1)
+          .get();
+        if (!snap.empty) {
+          const d = snap.docs[0]!;
+          const article = docToArticle(d.id, d.data());
+          if (
+            article.type === "news" &&
+            !hasSinhalaNewsText(article.title, article.excerpt)
+          ) {
+            return null;
           }
-        } catch {
-          // composite index may be missing — fall through to scan
-          break;
+          return article;
         }
       }
 
-      const published = await listArticles({ status: "published", limit: 100 });
+      const published = await listArticlesDb({
+        status: "published",
+        limit: 100,
+      });
       const match = published.find((a) => {
-          const title = (a.title || "").trim().replace(/[.\s]+$/g, "");
-          return slugVariants.some(
-            (v) =>
-              a.slug === v ||
-              a.slug.replace(/\s+/g, "-") === v.replace(/\s+/g, "-") ||
-              title === v ||
-              title === v.replace(/[.\s]+$/g, "") ||
-              // long Sinhala URLs: title is a prefix of the slug param
-              (v.length > 20 && (v.startsWith(title) || title.startsWith(v.slice(0, 40)))),
-          );
+        const title = (a.title || "").trim().replace(/[.\s]+$/g, "");
+        return slugVariants.some(
+          (v) =>
+            a.slug === v ||
+            a.slug.replace(/\s+/g, "-") === v.replace(/\s+/g, "-") ||
+            title === v ||
+            title === v.replace(/[.\s]+$/g, "") ||
+            (v.length > 20 &&
+              (v.startsWith(title) || title.startsWith(v.slice(0, 40)))),
+        );
       });
       return match ?? null;
     }
@@ -293,6 +284,7 @@ export async function getArticleBySlug(rawSlug: string): Promise<CmsArticle | nu
     if (configured) return null;
   }
 
+  if (configured || process.env.NODE_ENV === "production") return null;
   return mockToCms().find((a) => a.slug === slug) ?? null;
 }
 
@@ -300,17 +292,22 @@ export async function saveArticle(
   input: CmsArticleInput,
   id?: string,
 ): Promise<CmsArticle> {
-  const db = await tryFirestore();
+  if (typeof window !== "undefined") {
+    const data = await cmsFetch<{ article: CmsArticle }>("/api/admin/articles", {
+      method: "POST",
+      body: JSON.stringify({ input, id }),
+    });
+    return data.article;
+  }
+
+  const db = getAdminDb();
   if (!db) {
     throw new Error(
-      "Firebase configured නැහැ. .env.local එකේ Firebase keys දාන්න.",
+      "Turso configured නැහැ. TURSO_DATABASE_URL සහ TURSO_AUTH_TOKEN දාන්න.",
     );
   }
 
-  const { collection, doc, setDoc, addDoc } = await import("firebase/firestore");
-
   const nowIso = new Date().toISOString();
-  // Never use raw Sinhala title as URL slug
   const provided = input.slug?.trim();
   const looksLikeTitle =
     !provided ||
@@ -342,24 +339,15 @@ export async function saveArticle(
 
   try {
     if (id) {
-      const ref = doc(db, "articles", id);
-      await withTimeout(
-        setDoc(ref, payload, { merge: true }),
-        15000,
-        "Firestore save",
-      );
+      await db.collection("articles").doc(id).set(payload, { merge: true });
       return { id, views: 0, createdAt: nowIso, ...payload } as CmsArticle;
     }
 
-    const ref = await withTimeout(
-      addDoc(collection(db, "articles"), {
-        ...payload,
-        views: 0,
-        createdAt: nowIso,
-      }),
-      15000,
-      "Firestore save",
-    );
+    const ref = await db.collection("articles").add({
+      ...payload,
+      views: 0,
+      createdAt: nowIso,
+    });
 
     return {
       id: ref.id,
@@ -376,93 +364,67 @@ export async function setArticleStatus(
   id: string,
   status: "draft" | "published" | "archived",
 ): Promise<void> {
-  const db = await tryFirestore();
-  if (!db) throw new Error("Firebase configured නැහැ.");
-  const { doc, updateDoc } = await import("firebase/firestore");
+  if (typeof window !== "undefined") {
+    await cmsFetch(`/api/admin/articles/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+    return;
+  }
+
+  const db = getAdminDb();
+  if (!db) throw new Error("Turso configured නැහැ.");
   const nowIso = new Date().toISOString();
   try {
-    await withTimeout(
-      updateDoc(doc(db, "articles", id), {
-        status,
-        updatedAt: nowIso,
-        ...(status === "published" ? { publishedAt: nowIso } : {}),
-      }),
-      12000,
-      "Firestore status",
-    );
+    await db.collection("articles").doc(id).update({
+      status,
+      updatedAt: nowIso,
+      ...(status === "published" ? { publishedAt: nowIso } : {}),
+    });
   } catch (err) {
     throw new Error(mapFirebaseError(err));
   }
 }
 
 export async function deleteArticle(id: string): Promise<void> {
-  const db = await tryFirestore();
-  if (!db) throw new Error("Firebase configured නැහැ.");
-
-  // Prefer admin API so newsbot_blocked is written with Admin SDK
-  // (client rules may not be deployed yet).
-  try {
-    const { getFirebaseAuth } = await import("@/lib/firebase/client");
-    const auth = getFirebaseAuth();
-    const token = await auth?.currentUser?.getIdToken();
-    if (token) {
-      const res = await fetch(`/api/admin/articles/${encodeURIComponent(id)}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) return;
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      if (res.status !== 503) {
-        throw new Error(body.error || `Delete failed (${res.status})`);
-      }
-    }
-  } catch (err) {
-    if (
-      err instanceof Error &&
-      !/Admin SDK not configured|Failed to fetch|503/i.test(err.message)
-    ) {
-      throw err;
-    }
+  if (typeof window !== "undefined") {
+    await cmsFetch(`/api/admin/articles/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+    return;
   }
 
-  const { deleteDoc, doc, getDoc, setDoc } = await import("firebase/firestore");
+  const db = getAdminDb();
+  if (!db) throw new Error("Turso configured නැහැ.");
+
+  const { sourceUrlKey } = await import("@/lib/newsbot/blocklist");
   try {
-    const ref = doc(db, "articles", id);
-    const snap = await withTimeout(getDoc(ref), 12000, "Firestore get");
-    if (snap.exists()) {
-      const data = snap.data() as CmsArticle;
+    const snap = await db.collection("articles").doc(id).get();
+    if (snap.exists) {
+      const data = snap.data();
       const sourceUrl = String(data.sourceUrl || "").trim();
       if (sourceUrl) {
-        const { sourceUrlKeyAsync } = await import("@/lib/newsbot/blocklist");
-        const key = await sourceUrlKeyAsync(sourceUrl);
-        try {
-          await withTimeout(
-            setDoc(
-              doc(db, "newsbot_blocked", key),
-              {
-                sourceUrl,
-                sourceHash: data.sourceHash || null,
-                title: data.title || "",
-                reason: "admin_delete",
-                blockedAt: new Date().toISOString(),
-              },
-              { merge: true },
-            ),
-            12000,
-            "Firestore blocklist",
+        await db
+          .collection("newsbot_blocked")
+          .doc(sourceUrlKey(sourceUrl))
+          .set(
+            {
+              sourceUrl,
+              sourceHash: data.sourceHash || null,
+              title: data.title || "",
+              reason: "admin_delete",
+              blockedAt: new Date().toISOString(),
+            },
+            { merge: true },
           );
-        } catch {
-          /* rules may block until published — article delete still proceeds */
-        }
       }
     }
-    await withTimeout(deleteDoc(ref), 12000, "Firestore delete");
+    await db.collection("articles").doc(id).delete();
   } catch (err) {
     throw new Error(mapFirebaseError(err));
   }
 }
 
-/** Post a published article to the Facebook Page (server Graph API). */
 export async function postArticleToFacebook(
   articleId: string,
   options?: { force?: boolean },
@@ -474,19 +436,10 @@ export async function postArticleToFacebook(
   message?: string;
   error?: string;
 }> {
-  const { getFirebaseAuth } = await import("@/lib/firebase/client");
-  const auth = getFirebaseAuth();
-  const token = await auth?.currentUser?.getIdToken();
-  if (!token) {
-    throw new Error("Admin login අවශ්‍යයි (Facebook post).");
-  }
-
   const res = await fetch("/api/admin/facebook/post", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       articleId,
       force: Boolean(options?.force),
@@ -534,23 +487,35 @@ export function cmsToCard(article: CmsArticle) {
   };
 }
 
-/** Public view counter — once per article per browser session */
 export async function incrementArticleViews(id: string): Promise<void> {
-  if (!id || !isFirebaseConfigured()) return;
+  if (!id) return;
   if (typeof window !== "undefined") {
     const key = `fh-view-${id}`;
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, "1");
+    try {
+      await fetch("/api/news/view", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+    } catch (err) {
+      console.warn("[articles] view increment failed:", err);
+    }
+    return;
   }
 
+  if (!isDbConfigured()) return;
   try {
-    const db = await tryFirestore();
+    const db = getAdminDb();
     if (!db) return;
-    const { doc, increment, updateDoc } = await import("firebase/firestore");
-    await updateDoc(doc(db, "articles", id), { views: increment(1) });
+    const snap = await db.collection("articles").doc(id).get();
+    if (!snap.exists) return;
+    const views = Number(snap.data().views || 0) + 1;
+    await db.collection("articles").doc(id).update({ views });
   } catch (err) {
     console.warn("[articles] view increment failed:", err);
   }
 }
 
-export { slugify };
+export { slugify, listArticlesDb };

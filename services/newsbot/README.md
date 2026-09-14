@@ -2,11 +2,11 @@
 
 ## Flow
 
-RSS / list page → duplicate check → Firestore **draft** → Admin **Publish** at `/admin/articles`
+RSS / list page → duplicate check → Turso **published** articles → site `/news`
 
-Two runners (same drafts):
+Two runners (same endpoint):
 
-1. **GitHub Actions** every **10 minutes** → `POST https://fmheart-tau.vercel.app/api/cron/newsbot` (preferred)
+1. **GitHub Actions** every **10 minutes** → `POST https://www.fmheart.lk/api/cron/newsbot` (preferred)
 2. **Vercel Cron** daily backup → same endpoint (`vercel.json`, `0 3 * * *`)
 
 Primary ingest logic lives in Next.js: `src/lib/newsbot/ingest.ts`.
@@ -32,17 +32,19 @@ Categories are inferred per article (URL path, RSS tags, keywords) — not a sin
 
 ## YOU must do (one-time)
 
-### A) Firebase service account
-1. Firebase Console → project settings → Service accounts → **Generate new private key**
-2. Keep the JSON private
+### A) Turso (free, no credit card)
+1. https://turso.tech → Sign up with GitHub
+2. Create database `fmheart`
+3. Copy URL + token
 
 ### B) Vercel env vars
 Project → Settings → Environment Variables (Production + Preview):
 
 | Name | Value |
 |------|--------|
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | Full JSON contents |
-| `FIRESTORE_DB_ID` | `fmheart` |
+| `TURSO_DATABASE_URL` | `libsql://...` |
+| `TURSO_AUTH_TOKEN` | Turso auth token |
+| `ADMIN_PASSWORD` | CMS login password |
 | `CRON_SECRET` | Long random string (e.g. password manager) |
 
 Redeploy after saving.
@@ -77,8 +79,8 @@ Then open `/admin/articles` → Drafts → Publish.
 ```powershell
 cd services/newsbot
 pip install -r requirements.txt
-$env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\serviceAccount.json"
-$env:FIRESTORE_DB_ID="fmheart"
+$env:TURSO_DATABASE_URL="libsql://..."
+$env:TURSO_AUTH_TOKEN="..."
 python main.py
 ```
 
