@@ -152,7 +152,7 @@ export function LiveHomeFeed({
         />
       </div>
 
-      <div className="grid w-full max-w-full grid-cols-1 gap-8 pb-8 lg:grid-cols-[1fr_300px]">
+      <div className="grid w-full max-w-full grid-cols-1 items-start gap-8 pb-8 lg:grid-cols-[1fr_300px]">
         <div className="min-w-0 max-w-full space-y-10 overflow-x-clip">
           <AdSenseUnit
             slot={adSlot("inArticle")}
@@ -169,6 +169,17 @@ export function LiveHomeFeed({
           {feed.videos.length > 0 ? (
             <VideosSection videos={feed.videos} />
           ) : null}
+
+          {HOME_CATEGORY_SECTIONS.map((section) => (
+            <NewsGrid
+              key={section.key}
+              title={section.title}
+              articles={feed[section.key]}
+              viewAllHref={section.href}
+              maxRows={2}
+              mobileCount={6}
+            />
+          ))}
         </div>
 
         <aside className="min-w-0 space-y-5">
@@ -194,19 +205,6 @@ export function LiveHomeFeed({
             </a>
           </div>
         </aside>
-      </div>
-
-      <div className="w-full max-w-full space-y-10 pb-8">
-        {HOME_CATEGORY_SECTIONS.map((section) => (
-          <NewsGrid
-            key={section.key}
-            title={section.title}
-            articles={feed[section.key]}
-            viewAllHref={section.href}
-            maxRows={2}
-            mobileCount={6}
-          />
-        ))}
       </div>
     </>
   );
