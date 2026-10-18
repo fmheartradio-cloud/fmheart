@@ -11,16 +11,16 @@ export function AdvertiseWidget() {
         Grow Your Brand
       </p>
       <h2 className="mt-2 font-heading text-2xl font-extrabold leading-tight">
-        ADVERTISE WITH US
+        PROMOTION WITH US
       </h2>
       <p className="mt-2 max-w-[220px] text-sm text-white/85">
         FM Heart audience එකට reach වෙන්න — banner, sponsored & radio spots.
       </p>
       <Link
-        href="/advertise"
+        href="/promotion"
         className="mt-4 inline-flex bg-white px-4 py-2 font-heading text-sm font-bold text-fh-red transition hover:bg-neutral-100"
       >
-        CONTACT US
+        VIEW PLAN
       </Link>
     </aside>
   );

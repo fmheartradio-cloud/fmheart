@@ -22,6 +22,7 @@ const brandLinks = [
     external: true,
   },
   { href: "/about", label: "About" },
+  { href: "/promotion", label: "Promotion Plan" },
   { href: "/advertise", label: "Advertise With Us" },
   { href: "/contact", label: "Contact" },
 ];

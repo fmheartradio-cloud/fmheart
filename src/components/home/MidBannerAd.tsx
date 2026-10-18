@@ -7,17 +7,16 @@ export function MidBannerAd() {
         Partner With FM Heart
       </p>
       <h2 className="mt-2 font-heading text-2xl font-extrabold md:text-3xl">
-        YOUR BRAND HERE — Advertise With FM Heart
+        YOUR BRAND HERE — Promote With FM Heart
       </h2>
       <p className="mx-auto mt-2 max-w-xl text-sm text-neutral-400">
-        Google Ads friendly placements · Direct banners · Sponsored articles ·
-        Radio commercials
+        Homepage banners · Sponsored articles · Radio commercials · Social boost
       </p>
       <Link
-        href="/advertise"
+        href="/promotion"
         className="mt-5 inline-flex bg-fh-red px-6 py-2.5 font-heading text-sm font-bold tracking-wide text-white transition hover:bg-fh-red-dark"
       >
-        CONTACT US
+        PROMOTE WITH US
       </Link>
     </section>
   );

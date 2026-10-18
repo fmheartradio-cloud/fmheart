@@ -33,10 +33,10 @@ export function HeaderPromo() {
             WhatsApp
           </a>
           <Link
-            href="/advertise"
+            href="/promotion"
             className="inline-flex items-center justify-center border border-white/25 px-4 py-2.5 font-heading text-sm font-bold tracking-wide text-white transition hover:bg-white/10"
           >
-            ADVERTISE
+            PROMOTE WITH US
           </Link>
         </div>
       </div>

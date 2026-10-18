@@ -78,7 +78,7 @@ export default function LivePage() {
               {
                 title: "Advertise On Air",
                 body: "Radio commercials සහ sponsorship packages.",
-                href: "/advertise",
+                href: "/promotion",
               },
               {
                 title: "Pulse Studio",

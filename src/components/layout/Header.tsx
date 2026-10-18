@@ -16,6 +16,7 @@ const MAIN_NAV_LINKS = [
   { href: "/news?category=%E0%B7%80%E0%B7%92%E0%B6%AF%E0%B7%99%E0%B7%83%E0%B7%8A", label: "විදෙස්" },
   { href: "/gossip", label: "GOSSIP" },
   { href: "/videos", label: "VIDEOS" },
+  { href: "/promotion", label: "PROMOTION" },
   { href: "/advertise", label: "ADVERTISE" },
   { href: "/contact", label: "CONTACT" },
 ] as const;
@@ -53,10 +54,10 @@ export function Header() {
 
         <div className="ml-auto flex shrink-0 items-center gap-2 md:gap-3">
           <Link
-            href="/advertise"
+            href="/promotion"
             className="hidden rounded-md border border-neutral-200 px-3 py-2 font-heading text-xs font-bold tracking-wide text-fh-ink transition hover:border-fh-red hover:text-fh-red xl:inline-flex"
           >
-            ADVERTISE
+            PROMOTE WITH US
           </Link>
 
           <button

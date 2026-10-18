@@ -9,6 +9,7 @@ export const navLinks = [
   { href: "/news?category=%E0%B7%80%E0%B7%92%E0%B6%AF%E0%B7%99%E0%B7%83%E0%B7%8A", label: "විදෙස්" },
   { href: "/gossip", label: "GOSSIP" },
   { href: "/videos", label: "VIDEOS" },
+  { href: "/promotion", label: "PROMOTION" },
   { href: "/advertise", label: "ADVERTISE" },
   { href: "/contact", label: "CONTACT" },
 ];

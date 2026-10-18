@@ -107,8 +107,8 @@ export default function AboutPage() {
               </a>
               , Pulse Studio, සහ fmheart.lk main platform එක එකට linked. Radio
               advertising සහ sponsored content:{" "}
-              <Link href="/advertise" className="text-fh-red hover:underline">
-                Advertise page
+              <Link href="/promotion" className="text-fh-red hover:underline">
+                Promotion plan
               </Link>
               .
             </p>
