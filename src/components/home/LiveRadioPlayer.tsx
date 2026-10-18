@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useRadio } from "@/context/RadioProvider";
-import { SITE } from "@/lib/site";
+import { PlayerAd } from "@/components/home/PlayerAd";
 import { RadioSpectrum } from "@/components/home/RadioSpectrum";
 
 export function LiveRadioPlayer() {
@@ -11,7 +10,6 @@ export function LiveRadioPlayer() {
     isLoading,
     error,
     meta,
-    recent,
     toggle,
     primeSpectrum,
     volume,
@@ -84,47 +82,10 @@ export function LiveRadioPlayer() {
             {error}
           </p>
         )}
+      </div>
 
-        <div>
-          <p className="mb-2 text-[11px] tracking-wider text-neutral-500 uppercase">
-            Recently Played
-          </p>
-          {recent.length > 0 && (
-            <ul className="space-y-2">
-              {recent.map((track) => (
-                <li
-                  key={`${track.title}-${track.artist}-${track.time}`}
-                  className="flex items-center justify-between gap-2 border-b border-white/5 pb-2 text-sm"
-                >
-                  <span className="min-w-0 truncate">
-                    <span className="text-neutral-200">{track.title}</span>
-                    <span className="text-neutral-500"> — {track.artist}</span>
-                  </span>
-                  <span className="shrink-0 text-xs text-neutral-500">
-                    {track.time}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="mt-auto grid gap-2">
-          <Link
-            href="/live"
-            className="rounded-md border border-white/20 py-2.5 text-center font-heading text-sm font-bold tracking-wide transition hover:bg-white/10"
-          >
-            FULL PLAYER
-          </Link>
-          <a
-            href={`https://wa.me/${SITE.whatsapp}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-md bg-fh-whatsapp py-2.5 text-center font-heading text-sm font-bold text-fh-black transition hover:brightness-110"
-          >
-            WhatsApp Request
-          </a>
-        </div>
+      <div className="mt-auto px-2.5 pb-2.5">
+        <PlayerAd />
       </div>
     </aside>
   );

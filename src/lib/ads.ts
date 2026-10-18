@@ -6,6 +6,7 @@ export const ADS = {
     header: process.env.NEXT_PUBLIC_ADSENSE_SLOT_HEADER || "",
     sidebar: process.env.NEXT_PUBLIC_ADSENSE_SLOT_SIDEBAR || "",
     inArticle: process.env.NEXT_PUBLIC_ADSENSE_SLOT_INARTICLE || "",
+    player: process.env.NEXT_PUBLIC_ADSENSE_SLOT_PLAYER || "",
   },
 } as const;
 

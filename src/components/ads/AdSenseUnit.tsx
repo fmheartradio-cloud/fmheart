@@ -7,6 +7,9 @@ type AdSenseUnitProps = {
   format?: "auto" | "rectangle" | "horizontal" | "vertical";
   className?: string;
   label?: string;
+  width?: number;
+  height?: number;
+  responsive?: boolean;
 };
 
 declare global {
@@ -20,6 +23,9 @@ export function AdSenseUnit({
   format = "auto",
   className = "",
   label = "Advertisement",
+  width,
+  height,
+  responsive = true,
 }: AdSenseUnitProps) {
   const pushed = useRef(false);
   const client = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
@@ -36,12 +42,28 @@ export function AdSenseUnit({
     }
   }, [ready]);
 
+  const boxStyle =
+    width && height
+      ? {
+          display: "inline-block" as const,
+          width: `${width}px`,
+          height: `${height}px`,
+          maxWidth: "100%",
+        }
+      : { display: "block" as const, width: "100%", maxWidth: "100%" };
+
   if (!ready) {
     return (
       <div
         className={`flex min-h-[90px] w-full items-center justify-center border border-dashed border-neutral-300 bg-neutral-100 text-center ${className}`}
         aria-label={label}
-        style={{ display: "flex", width: "100%", maxWidth: "100%", boxSizing: "border-box" }}
+        style={{
+          display: "flex",
+          width: width ? `${width}px` : "100%",
+          height: height ? `${height}px` : undefined,
+          maxWidth: "100%",
+          boxSizing: "border-box",
+        }}
       >
         <div className="px-4 py-3">
           <p className="text-[10px] uppercase tracking-[0.2em] text-fh-muted">
@@ -57,12 +79,12 @@ export function AdSenseUnit({
 
   return (
     <ins
-      className={`adsbygoogle block w-full ${className}`}
-      style={{ display: "block", width: "100%", maxWidth: "100%" }}
+      className={`adsbygoogle ${width && height ? "inline-block" : "block w-full"} ${className}`}
+      style={boxStyle}
       data-ad-client={client}
       data-ad-slot={slot}
       data-ad-format={format}
-      data-full-width-responsive="true"
+      data-full-width-responsive={responsive ? "true" : "false"}
     />
   );
 }

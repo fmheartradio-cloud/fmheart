@@ -2,6 +2,17 @@
 
 export const HOME_AD_SLOTS = [
   {
+    id: "player",
+    name: "Live Player Banner",
+    nameSi: "Radio player ඇතුළේ",
+    location: "Homepage live radio box එකේ Recently Played තිබුණු තැන",
+    iab: "Medium Rectangle",
+    sizes: ["300 × 250"],
+    minHeight: "250px",
+    width: "300px",
+    type: "AdSense or direct",
+  },
+  {
     id: "header",
     name: "Header Banner",
     nameSi: "ප්‍රධාන Banner",
@@ -62,7 +73,7 @@ export const PROMOTION_PACKAGES = [
   {
     title: "Website Banners",
     detail:
-      "Homepage header 728×90, in-feed, sidebar 300×250, සහ footer banner — weekly or monthly.",
+      "Live player 300×250, homepage header 728×90, in-feed, sidebar 300×250, සහ footer banner — weekly or monthly.",
   },
   {
     title: "Sponsored Story",

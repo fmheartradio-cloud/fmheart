@@ -162,6 +162,16 @@ export default function PromotionPage() {
 }
 
 function SlotPreview({ id }: { id: string }) {
+  if (id === "player") {
+    return (
+      <div className="mt-4 flex justify-center bg-fh-ink p-4">
+        <div className="flex h-[125px] w-[150px] items-center justify-center border border-dashed border-white/30 bg-white/5 text-center text-[10px] font-heading font-bold tracking-wide text-white/70">
+          300 × 250
+        </div>
+      </div>
+    );
+  }
+
   if (id === "sidebar") {
     return (
       <div className="mt-4 flex justify-center bg-fh-surface p-4">
