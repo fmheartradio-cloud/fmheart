@@ -1,6 +1,6 @@
 import type { NewsCategory } from "@/types";
 
-/** Labels used across FM Heart (NewsCategory + home CategoryIcons). */
+/** Labels used across FM Heart news categories. */
 export const FM_HEART_NEWS_CATEGORIES = [
   "දේශීය",
   "දේශපාලන",

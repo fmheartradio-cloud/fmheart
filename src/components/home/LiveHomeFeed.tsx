@@ -2,7 +2,6 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { AdvertiseWidget } from "@/components/home/AdvertiseWidget";
-import { CategoryIcons } from "@/components/home/CategoryIcons";
 import { HeroSlider } from "@/components/home/HeroSlider";
 import { LiveRadioPlayer } from "@/components/home/LiveRadioPlayer";
 import { MostRead } from "@/components/home/MostRead";
@@ -10,6 +9,7 @@ import { NewsGrid, type NewsCard } from "@/components/home/NewsGrid";
 import { VideosSection } from "@/components/home/VideosSection";
 import { AdSenseUnit } from "@/components/ads/AdSenseUnit";
 import { adSlot } from "@/lib/ads";
+import { HOME_CATEGORY_SECTIONS } from "@/lib/home-category-news";
 import type { Article, VideoItem } from "@/types";
 
 const POLL_MS = 45_000;
@@ -20,6 +20,9 @@ type HomeFeedPayload = {
   gossip: NewsCard[];
   mostRead: Article[];
   videos: VideoItem[];
+  foreign: NewsCard[];
+  business: NewsCard[];
+  sports: NewsCard[];
 };
 
 type LiveHomeFeedProps = HomeFeedPayload & {
@@ -31,6 +34,9 @@ function fingerprint(payload: HomeFeedPayload): string {
     payload.news.map((a) => a.id).join(","),
     payload.gossip.map((a) => a.id).join(","),
     payload.videos.map((v) => v.id).join(","),
+    payload.foreign.map((a) => a.id).join(","),
+    payload.business.map((a) => a.id).join(","),
+    payload.sports.map((a) => a.id).join(","),
   ].join("|");
 }
 
@@ -40,6 +46,9 @@ export function LiveHomeFeed({
   gossip: initialGossip,
   mostRead: initialMostRead,
   videos: initialVideos,
+  foreign: initialForeign,
+  business: initialBusiness,
+  sports: initialSports,
   headerPromo,
 }: LiveHomeFeedProps) {
   const [feed, setFeed] = useState<HomeFeedPayload>({
@@ -48,6 +57,9 @@ export function LiveHomeFeed({
     gossip: initialGossip,
     mostRead: initialMostRead,
     videos: initialVideos,
+    foreign: initialForeign,
+    business: initialBusiness,
+    sports: initialSports,
   });
   const [fresh, setFresh] = useState(false);
 
@@ -74,6 +86,9 @@ export function LiveHomeFeed({
                 ? data.videos
                 : prev.videos
               : prev.videos,
+            foreign: data.foreign?.length ? data.foreign : prev.foreign,
+            business: data.business?.length ? data.business : prev.business,
+            sports: data.sports?.length ? data.sports : prev.sports,
           };
           if (fingerprint(next) !== fingerprint(prev)) {
             setFresh(true);
@@ -154,8 +169,6 @@ export function LiveHomeFeed({
           {feed.videos.length > 0 ? (
             <VideosSection videos={feed.videos} />
           ) : null}
-
-          <CategoryIcons />
         </div>
 
         <aside className="min-w-0 space-y-5">
@@ -181,6 +194,19 @@ export function LiveHomeFeed({
             </a>
           </div>
         </aside>
+      </div>
+
+      <div className="w-full max-w-full space-y-10 pb-8">
+        {HOME_CATEGORY_SECTIONS.map((section) => (
+          <NewsGrid
+            key={section.key}
+            title={section.title}
+            articles={feed[section.key]}
+            viewAllHref={section.href}
+            maxRows={2}
+            mobileCount={6}
+          />
+        ))}
       </div>
     </>
   );

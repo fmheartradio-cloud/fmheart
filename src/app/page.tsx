@@ -9,6 +9,7 @@ import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
 import { adSlot } from "@/lib/ads";
 import { formatSriLankaDateTime } from "@/lib/datetime";
+import { pickHomeCategoryNews } from "@/lib/home-category-news";
 import { cmsToCard, listArticles } from "@/services/articles";
 import { cmsToHeroSlide } from "@/services/hero";
 import { getPublicVideos } from "@/services/videos";
@@ -17,15 +18,20 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function HomePage() {
-  const [news, gossip, videos] = await Promise.all([
-    listArticles({ type: "news", status: "published", limit: 12 }),
+  const [allNews, gossip, videos] = await Promise.all([
+    listArticles({ type: "news", status: "published", limit: 80 }),
     listArticles({ type: "gossip", status: "published", limit: 9 }),
     getPublicVideos(8),
   ]);
 
+  const news = allNews.slice(0, 12);
+  const categories = pickHomeCategoryNews(allNews, 6);
   const heroSlides = news.slice(0, 10).map(cmsToHeroSlide);
   const newsCards = news.map(cmsToCard);
   const gossipCards = gossip.map(cmsToCard);
+  const foreign = categories.foreign.map(cmsToCard);
+  const business = categories.business.map(cmsToCard);
+  const sports = categories.sports.map(cmsToCard);
   const mostReadCards = news.slice(0, 5).map((a) => ({
     id: a.id,
     title: a.title,
@@ -60,6 +66,9 @@ export default async function HomePage() {
             gossip={gossipCards}
             mostRead={mostReadCards}
             videos={videos}
+            foreign={foreign}
+            business={business}
+            sports={sports}
             headerPromo={headerPromo}
           />
         </div>
