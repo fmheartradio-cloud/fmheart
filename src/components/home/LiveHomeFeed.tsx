@@ -142,7 +142,7 @@ export function LiveHomeFeed({
 
       <div className="grid w-full max-w-full grid-cols-1 gap-0 lg:grid-cols-[1fr_320px]">
         <HeroSlider slides={feed.heroSlides} />
-        <div className="flex min-h-[560px] w-full min-w-0 max-w-full flex-col lg:h-auto lg:min-h-full">
+        <div className="flex h-full min-h-0 w-full min-w-0 max-w-full flex-col">
           <LiveRadioPlayer playerBanner={playerBanner} />
         </div>
       </div>

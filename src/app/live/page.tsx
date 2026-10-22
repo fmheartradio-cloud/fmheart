@@ -57,7 +57,7 @@ export default async function LivePage() {
                 Stream powered by FM Heart · Song requests via WhatsApp
               </p>
             </div>
-            <div className="min-h-[560px] overflow-visible rounded-lg border border-white/10">
+            <div className="overflow-hidden rounded-lg border border-white/10">
               <LiveRadioPlayer playerBanner={ads.banners.player} />
             </div>
           </div>
