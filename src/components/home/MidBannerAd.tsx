@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { DirectBanner } from "@/components/ads/DirectBanner";
+import { HOME_AD_SLOT_PIXELS } from "@/lib/ad-placements";
 import { isLiveBanner, type DirectAdBanner } from "@/types/ads";
 
 export function MidBannerAd({ banner }: { banner?: DirectAdBanner | null }) {
@@ -11,9 +12,9 @@ export function MidBannerAd({ banner }: { banner?: DirectAdBanner | null }) {
             imageUrl={banner.imageUrl}
             href={banner.href || "/promotion"}
             alt={banner.alt || "Partner with FM Heart"}
-            width={1200}
-            height={160}
-            fill
+            width={HOME_AD_SLOT_PIXELS.partnerStrip.width}
+            height={HOME_AD_SLOT_PIXELS.partnerStrip.height}
+            fill={HOME_AD_SLOT_PIXELS.partnerStrip.fill}
             objectFit="contain"
             className="w-full bg-fh-black"
           />

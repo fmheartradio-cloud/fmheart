@@ -7,6 +7,9 @@ export const HOME_AD_SLOTS = [
     nameSi: "Radio player ඇතුළේ",
     location: "Homepage live radio box එකේ Recently Played තිබුණු තැන",
     iab: "Medium Rectangle",
+    widthPx: 300,
+    heightPx: 250,
+    fill: false,
     sizes: ["300 × 250"],
     minHeight: "250px",
     width: "300px",
@@ -16,22 +19,28 @@ export const HOME_AD_SLOTS = [
     id: "header",
     name: "Header Banner",
     nameSi: "ප්‍රධාන Banner",
-    location: "Hero slider සහ live radio එකට පහළින්, full content width",
-    iab: "Leaderboard",
-    sizes: ["728 × 90 — same ratio on mobile & desktop"],
-    minHeight: "90px",
-    width: "100% (max ~1280px)",
+    location: "Hero slider සහ live radio එකට පහළින්, full content width (max-w-7xl)",
+    iab: "Full-width banner",
+    widthPx: 1280,
+    heightPx: 160,
+    fill: true,
+    sizes: ["1280 × 160"],
+    minHeight: "160px",
+    width: "100% (max 1280px)",
     type: "AdSense or direct",
   },
   {
     id: "inFeed",
     name: "In-Feed",
     nameSi: "News feed ඇතුළේ",
-    location: "නවතම ප්‍රවෘත්ති grid එකට පහළින්, gossip එකට ඉහළින්",
-    iab: "In-feed / Medium Rectangle",
-    sizes: ["300 × 250", "336 × 280", "fluid responsive"],
-    minHeight: "100px",
-    width: "Main column",
+    location: "නවතම ප්‍රවෘත්ති grid එකට පහළින්, gossip එකට ඉහළින් — news column පුරා",
+    iab: "Billboard",
+    widthPx: 970,
+    heightPx: 250,
+    fill: true,
+    sizes: ["970 × 250"],
+    minHeight: "250px",
+    width: "Main column (~900–970px)",
     type: "AdSense or direct",
   },
   {
@@ -40,6 +49,9 @@ export const HOME_AD_SLOTS = [
     nameSi: "උඩු අතට තීරුව",
     location: "Desktop දකුණු sidebar (300px column)",
     iab: "Medium Rectangle",
+    widthPx: 300,
+    heightPx: 250,
+    fill: false,
     sizes: ["300 × 250"],
     minHeight: "250px",
     width: "300px",
@@ -49,44 +61,56 @@ export const HOME_AD_SLOTS = [
     id: "footer",
     name: "Footer Banner",
     nameSi: "Footer ට ඉහළ Banner",
-    location: "Brand promo cards වලට පහළින්, footer ට ඉහළින්",
-    iab: "Leaderboard",
-    sizes: ["728 × 90 — same ratio on mobile & desktop"],
-    minHeight: "90px",
-    width: "100% (max ~1280px)",
+    location: "Brand promo cards වලට පහළින්, footer ට ඉහළින්, full content width",
+    iab: "Full-width banner",
+    widthPx: 1280,
+    heightPx: 160,
+    fill: true,
+    sizes: ["1280 × 160"],
+    minHeight: "160px",
+    width: "100% (max 1280px)",
     type: "AdSense or direct",
   },
   {
     id: "partnerStrip",
     name: "Partner Strip",
     nameSi: "Full-width partner band",
-    location: "News section ට පහළින්, page පුරාම black band",
-    iab: "Custom / takeover",
-    sizes: ["Full bleed · ~1200 × 160+"],
+    location: "News section ට පහළින්, content width black band",
+    iab: "Full-width band",
+    widthPx: 1280,
+    heightPx: 160,
+    fill: true,
+    sizes: ["1280 × 160"],
     minHeight: "160px",
-    width: "Full viewport",
+    width: "100% (max 1280px)",
     type: "Direct only",
   },
 ] as const;
 
-/** Pixel boxes used on the homepage — scale by CSS aspect-ratio, never swap to 320×50. */
+export type HomeAdSlotDef = (typeof HOME_AD_SLOTS)[number];
+export type HomeAdSlotDefId = HomeAdSlotDef["id"];
+
+/** Pixel boxes used on the homepage — scale by CSS aspect-ratio. */
 export const HOME_AD_SLOT_PIXELS: Record<
-  (typeof HOME_AD_SLOTS)[number]["id"],
-  { width: number; height: number }
-> = {
-  player: { width: 300, height: 250 },
-  header: { width: 728, height: 90 },
-  inFeed: { width: 300, height: 250 },
-  sidebar: { width: 300, height: 250 },
-  footer: { width: 728, height: 90 },
-  partnerStrip: { width: 1200, height: 160 },
-};
+  HomeAdSlotDefId,
+  { width: number; height: number; fill: boolean }
+> = Object.fromEntries(
+  HOME_AD_SLOTS.map((slot) => [
+    slot.id,
+    { width: slot.widthPx, height: slot.heightPx, fill: slot.fill },
+  ]),
+) as Record<HomeAdSlotDefId, { width: number; height: number; fill: boolean }>;
+
+export function slotSizeLabel(id: HomeAdSlotDefId): string {
+  const { width, height } = HOME_AD_SLOT_PIXELS[id];
+  return `${width} × ${height}`;
+}
 
 export const PROMOTION_PACKAGES = [
   {
     title: "Website Banners",
     detail:
-      "Live player 300×250, homepage header 728×90, in-feed, sidebar 300×250, සහ footer banner — weekly or monthly.",
+      "Live player 300×250, homepage header 1280×160, in-feed 970×250, sidebar 300×250, footer 1280×160 — weekly or monthly.",
   },
   {
     title: "Sponsored Story",

@@ -20,7 +20,7 @@ export default function AdminBannersPage() {
         >
           <p className="font-heading text-lg font-extrabold">Ad banners</p>
           <p className="mt-1 text-sm text-fh-muted">
-            Header, sidebar, in-feed, footer, player 300×250
+            Header 1280×160, in-feed 970×250, player/sidebar 300×250
           </p>
         </Link>
         <Link

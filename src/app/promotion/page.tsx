@@ -4,7 +4,13 @@ import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
-import { HOME_AD_SLOTS, PROMOTION_PACKAGES } from "@/lib/ad-placements";
+import {
+  HOME_AD_SLOT_PIXELS,
+  HOME_AD_SLOTS,
+  PROMOTION_PACKAGES,
+  slotSizeLabel,
+  type HomeAdSlotDefId,
+} from "@/lib/ad-placements";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -161,54 +167,23 @@ export default function PromotionPage() {
   );
 }
 
-function SlotPreview({ id }: { id: string }) {
-  if (id === "player") {
-    return (
-      <div className="mt-4 flex justify-center bg-fh-ink p-4">
-        <div className="flex h-[125px] w-[150px] items-center justify-center border border-dashed border-white/30 bg-white/5 text-center text-[10px] font-heading font-bold tracking-wide text-white/70">
-          300 × 250
-        </div>
-      </div>
-    );
-  }
-
-  if (id === "sidebar") {
-    return (
-      <div className="mt-4 flex justify-center bg-fh-surface p-4">
-        <div className="flex h-[125px] w-[150px] items-center justify-center border border-dashed border-neutral-400 bg-white text-center text-[10px] font-heading font-bold tracking-wide text-neutral-500">
-          300 × 250
-        </div>
-      </div>
-    );
-  }
-
-  if (id === "inFeed") {
-    return (
-      <div className="mt-4 bg-fh-surface p-4">
-        <div className="flex min-h-[80px] w-full items-center justify-center border border-dashed border-neutral-400 bg-white text-[10px] font-heading font-bold tracking-wide text-neutral-500">
-          IN-FEED · 300 × 250 / fluid
-        </div>
-      </div>
-    );
-  }
-
-  if (id === "partnerStrip") {
-    return (
-      <div className="mt-4 bg-fh-black px-3 py-6 text-center">
-        <p className="font-heading text-[10px] tracking-[0.2em] text-fh-red uppercase">
-          Full bleed
-        </p>
-        <p className="mt-1 font-heading text-xs font-bold text-white">
-          Partner strip
-        </p>
-      </div>
-    );
-  }
-
+function SlotPreview({ id }: { id: HomeAdSlotDefId }) {
+  const px = HOME_AD_SLOT_PIXELS[id];
+  const dark = id === "player" || id === "partnerStrip";
   return (
-    <div className="mt-4 bg-fh-surface p-3">
-      <div className="flex min-h-[48px] w-full items-center justify-center border border-dashed border-neutral-400 bg-white text-[10px] font-heading font-bold tracking-wide text-neutral-500">
-        728 × 90 LEADERBOARD
+    <div className={`mt-4 p-3 ${dark ? "bg-fh-ink" : "bg-fh-surface"}`}>
+      <div
+        className={`mx-auto flex w-full items-center justify-center overflow-hidden border border-dashed text-center text-[10px] font-heading font-bold tracking-wide ${
+          dark
+            ? "border-white/30 bg-white/5 text-white/70"
+            : "border-neutral-400 bg-white text-neutral-500"
+        }`}
+        style={{
+          maxWidth: px.fill ? "100%" : px.width,
+          aspectRatio: `${px.width} / ${px.height}`,
+        }}
+      >
+        {slotSizeLabel(id)}
       </div>
     </div>
   );

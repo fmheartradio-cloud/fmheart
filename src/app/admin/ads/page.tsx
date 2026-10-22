@@ -254,9 +254,8 @@ export default function AdminAdsPage() {
         </h1>
         <p className="mt-1 text-sm text-fh-muted">
           Browse computer කරලා local banner file එකක් තෝරන්න. ඕන නම් image
-          URL එකක් paste කරන්නත් පුළුවන්. Header / footer 728×90 — phone
-          එකේත් desktop එකේත් ratio එක same (320×50 box එකකට stretch වෙන්නේ
-          නෑ).
+          URL එකක් paste කරන්නත් පුළුවන්. Slot එකේ ලියලා තියෙන resolution
+          එකටම design කරන්න — phone එකේත් desktop එකේත් ratio එක same.
         </p>
       </div>
 

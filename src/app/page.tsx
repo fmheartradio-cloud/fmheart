@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
+import { HOME_AD_SLOT_PIXELS } from "@/lib/ad-placements";
 import { formatSriLankaDateTime } from "@/lib/datetime";
 import { pickHomeCategoryNews } from "@/lib/home-category-news";
 import { getPublicAds } from "@/services/ads";
@@ -44,14 +45,17 @@ export default async function HomePage() {
     slug: a.slug,
   }));
 
+  const headerPx = HOME_AD_SLOT_PIXELS.header;
+  const footerPx = HOME_AD_SLOT_PIXELS.footer;
+
   const headerPromo = (
     <HomeAdSlot
       banner={ads.banners.header}
       adsenseKind="header"
       label="Header Banner"
-      width={728}
-      height={90}
-      fill
+      width={headerPx.width}
+      height={headerPx.height}
+      fill={headerPx.fill}
       className="w-full bg-neutral-100"
       fallback={<HeaderPromo />}
     />
@@ -88,9 +92,9 @@ export default async function HomePage() {
             banner={ads.banners.footer}
             adsenseKind="header"
             label="Before Footer Banner"
-            width={728}
-            height={90}
-            fill
+            width={footerPx.width}
+            height={footerPx.height}
+            fill={footerPx.fill}
             className="w-full bg-neutral-100"
           />
         </div>

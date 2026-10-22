@@ -8,6 +8,7 @@ import { LiveRadioPlayer } from "@/components/home/LiveRadioPlayer";
 import { MostRead } from "@/components/home/MostRead";
 import { NewsGrid, type NewsCard } from "@/components/home/NewsGrid";
 import { VideosSection } from "@/components/home/VideosSection";
+import { HOME_AD_SLOT_PIXELS } from "@/lib/ad-placements";
 import { HOME_CATEGORY_SECTIONS } from "@/lib/home-category-news";
 import type { Article, VideoItem } from "@/types";
 import type { DirectAdBanner } from "@/types/ads";
@@ -164,8 +165,9 @@ export function LiveHomeFeed({
             banner={inFeedBanner}
             adsenseKind="inArticle"
             label="In-Feed Ad"
-            width={300}
-            height={250}
+            width={HOME_AD_SLOT_PIXELS.inFeed.width}
+            height={HOME_AD_SLOT_PIXELS.inFeed.height}
+            fill={HOME_AD_SLOT_PIXELS.inFeed.fill}
             className="bg-neutral-100"
           />
 
@@ -198,8 +200,9 @@ export function LiveHomeFeed({
             banner={sidebarBanner}
             adsenseKind="sidebar"
             label="Sidebar 300×250"
-            width={300}
-            height={250}
+            width={HOME_AD_SLOT_PIXELS.sidebar.width}
+            height={HOME_AD_SLOT_PIXELS.sidebar.height}
+            fill={HOME_AD_SLOT_PIXELS.sidebar.fill}
             format="rectangle"
             className="bg-neutral-100"
           />
