@@ -22,8 +22,8 @@ export function LiveRadioPlayer({
   } = useRadio();
 
   return (
-    <aside className="flex h-full w-full flex-col bg-fh-ink text-white">
-      <div className="border-b border-white/10 px-4 py-3">
+    <aside className="flex min-h-full w-full flex-col bg-fh-ink text-white">
+      <div className="shrink-0 border-b border-white/10 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span
@@ -39,7 +39,7 @@ export function LiveRadioPlayer({
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-4 p-4">
+      <div className="flex flex-col gap-4 p-4">
         <div className="flex items-center gap-4">
           <button
             type="button"
@@ -89,7 +89,7 @@ export function LiveRadioPlayer({
         )}
       </div>
 
-      <div className="mt-auto px-2.5 pb-2.5">
+      <div className="mt-auto shrink-0 px-2.5 pb-2.5 pt-1">
         <PlayerAd banner={playerBanner} />
       </div>
     </aside>
