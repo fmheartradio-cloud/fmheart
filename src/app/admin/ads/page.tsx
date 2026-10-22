@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import { HOME_AD_SLOTS } from "@/lib/ad-placements";
 import {
   emptyAdsSettings,
@@ -48,15 +54,15 @@ function SlotCard({
   banner: DirectAdBanner;
   onChange: (patch: Partial<DirectAdBanner>) => void;
 }) {
+  const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadErr, setUploadErr] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
 
-  async function onFile(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
+  async function handleLocalFile(file: File) {
     setUploading(true);
     setUploadErr(null);
+    setFileName(file.name);
     try {
       const url = await uploadImage(file);
       onChange({ imageUrl: url, enabled: true });
@@ -65,6 +71,12 @@ function SlotCard({
     } finally {
       setUploading(false);
     }
+  }
+
+  function onFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) void handleLocalFile(file);
   }
 
   return (
@@ -91,22 +103,31 @@ function SlotCard({
 
       <div className="mt-4 grid gap-3">
         <div>
-          <p className="text-sm font-semibold text-fh-ink">Ad image</p>
-          <label className="mt-1 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-neutral-300 bg-[#f8f9fc] px-4 py-5 text-center hover:border-fh-red/60">
+          <p className="text-sm font-semibold text-fh-ink">
+            Banner image (local file)
+          </p>
+          <div className="mt-1 flex flex-col gap-2 rounded-xl border border-neutral-200 bg-[#f8f9fc] p-3 sm:flex-row sm:items-center">
             <input
+              ref={fileRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              className="sr-only"
+              accept="image/*"
               disabled={uploading}
-              onChange={(e) => void onFile(e)}
+              onChange={onFile}
+              className="min-w-0 flex-1 text-sm file:mr-3 file:rounded-full file:border-0 file:bg-fh-red file:px-4 file:py-2 file:font-heading file:text-sm file:font-bold file:text-white"
             />
-            <span className="font-heading text-sm font-bold">
-              {uploading ? "Uploading…" : "Upload image"}
-            </span>
-            <span className="mt-1 text-xs text-fh-muted">
-              Phone / computer එකෙන් JPG, PNG, WebP තෝරන්න
-            </span>
-          </label>
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={() => fileRef.current?.click()}
+              className="min-h-11 shrink-0 rounded-full bg-fh-red px-5 font-heading text-sm font-bold text-white disabled:opacity-60"
+            >
+              {uploading ? "Uploading…" : "Browse computer"}
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-fh-muted">
+            Computer එකෙන් JPG / PNG / WebP file එකක් Browse කරලා තෝරන්න.
+            {fileName ? ` Selected: ${fileName}` : ""}
+          </p>
           {uploadErr ? (
             <p className="mt-2 text-sm text-fh-red">{uploadErr}</p>
           ) : null}
@@ -222,8 +243,8 @@ export default function AdminAdsPage() {
           Ad banners
         </h1>
         <p className="mt-1 text-sm text-fh-muted">
-          Image එක upload කරන්න, නැත්නම් link එකක් paste කරන්න. Click link එකත්
-          දාලා Save කරන්න.
+          Browse computer කරලා local banner file එකක් තෝරන්න. ඕන නම් image
+          URL එකක් paste කරන්නත් පුළුවන්. Click link දාලා Save කරන්න.
         </p>
       </div>
 

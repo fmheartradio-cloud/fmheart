@@ -23,7 +23,12 @@ export async function saveImageUpload(
   file: File,
   kind = "ad",
 ): Promise<{ id: string; url: string }> {
-  if (!ALLOWED.has(file.type)) {
+  const namedOk = /\.(jpe?g|png|webp|gif|bmp)$/i.test(file.name || "");
+  const typeOk =
+    !file.type ||
+    ALLOWED.has(file.type) ||
+    file.type.startsWith("image/");
+  if (!typeOk && !namedOk) {
     throw new Error("JPG, PNG, WebP හෝ GIF විතරක් upload කරන්න.");
   }
   if (file.size > MAX_BYTES) {
