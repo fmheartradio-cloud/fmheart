@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { HOME_AD_SLOTS } from "@/lib/ad-placements";
 import {
   emptyAdsSettings,
@@ -10,7 +10,26 @@ import {
 import type { AdsSettings, DirectAdBanner, HomeAdSlotId } from "@/types/ads";
 
 const FIELD =
-  "mt-1 w-full border border-neutral-300 bg-white px-3 py-3 text-base outline-none focus:ring-2 focus:ring-fh-red";
+  "mt-1 w-full rounded-xl border border-neutral-200 bg-white px-3 py-3 text-base outline-none focus:ring-2 focus:ring-fh-red";
+
+async function uploadImage(file: File): Promise<string> {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("kind", "ad");
+  const res = await fetch("/api/admin/upload", {
+    method: "POST",
+    credentials: "include",
+    body: fd,
+  });
+  const data = (await res.json().catch(() => ({}))) as {
+    url?: string;
+    error?: string;
+  };
+  if (!res.ok || !data.url) {
+    throw new Error(data.error || "Upload failed");
+  }
+  return data.url;
+}
 
 function SlotCard({
   slotId,
@@ -29,8 +48,27 @@ function SlotCard({
   banner: DirectAdBanner;
   onChange: (patch: Partial<DirectAdBanner>) => void;
 }) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState<string | null>(null);
+
+  async function onFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    setUploadErr(null);
+    try {
+      const url = await uploadImage(file);
+      onChange({ imageUrl: url, enabled: true });
+    } catch (err) {
+      setUploadErr(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
-    <section className="border border-neutral-200 bg-white p-4 sm:p-5">
+    <section className="rounded-2xl bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="font-heading text-lg font-extrabold">{title}</p>
@@ -40,7 +78,7 @@ function SlotCard({
             {sizes.join(" · ")}
           </p>
         </div>
-        <label className="flex min-h-11 shrink-0 items-center gap-2 self-start rounded-sm bg-fh-surface px-3 py-2 text-sm font-semibold">
+        <label className="flex min-h-11 shrink-0 items-center gap-2 self-start rounded-full bg-[#f4f6fb] px-3 py-2 text-sm font-semibold">
           <input
             type="checkbox"
             checked={banner.enabled}
@@ -52,10 +90,32 @@ function SlotCard({
       </div>
 
       <div className="mt-4 grid gap-3">
+        <div>
+          <p className="text-sm font-semibold text-fh-ink">Ad image</p>
+          <label className="mt-1 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-neutral-300 bg-[#f8f9fc] px-4 py-5 text-center hover:border-fh-red/60">
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="sr-only"
+              disabled={uploading}
+              onChange={(e) => void onFile(e)}
+            />
+            <span className="font-heading text-sm font-bold">
+              {uploading ? "Uploading…" : "Upload image"}
+            </span>
+            <span className="mt-1 text-xs text-fh-muted">
+              Phone / computer එකෙන් JPG, PNG, WebP තෝරන්න
+            </span>
+          </label>
+          {uploadErr ? (
+            <p className="mt-2 text-sm text-fh-red">{uploadErr}</p>
+          ) : null}
+        </div>
+
         <label className="text-sm font-semibold text-fh-ink">
-          Image URL
+          or paste image URL
           <input
-            type="url"
+            type="text"
             inputMode="url"
             placeholder="https://…/banner.jpg"
             value={banner.imageUrl}
@@ -66,7 +126,7 @@ function SlotCard({
         <label className="text-sm font-semibold text-fh-ink">
           Click link
           <input
-            type="url"
+            type="text"
             inputMode="url"
             placeholder="https://brand.lk or /promotion"
             value={banner.href}
@@ -87,7 +147,7 @@ function SlotCard({
       </div>
 
       {banner.imageUrl ? (
-        <div className="mt-4 border border-dashed border-neutral-200 bg-neutral-50 p-2">
+        <div className="mt-4 rounded-xl border border-dashed border-neutral-200 bg-neutral-50 p-2">
           <p className="mb-2 text-[11px] tracking-wider text-fh-muted uppercase">
             Preview · {slotId}
           </p>
@@ -100,8 +160,8 @@ function SlotCard({
         </div>
       ) : (
         <p className="mt-4 text-sm text-fh-muted">
-          Image URL එකක් දැම්මාම preview එක පෙන්වනවා. Enable කරලා Save කරාම
-          homepage එකේ මේ slot එකට AdSense ට වඩා මේ banner එක යනවා.
+          Upload කරලා හෝ URL එකක් දැම්මාම preview එක පෙන්වනවා. Enable + Save
+          කරාම homepage එකේ මේ slot එකට යනවා.
         </p>
       )}
     </section>
@@ -162,8 +222,8 @@ export default function AdminAdsPage() {
           Ad banners
         </h1>
         <p className="mt-1 text-sm text-fh-muted">
-          Homepage slot එකකට image URL + click link දාලා enable කරන්න. Empty
-          තියෙන slot වලට AdSense හෝ “Promote With Us” placeholder යනවා.
+          Image එක upload කරන්න, නැත්නම් link එකක් paste කරන්න. Click link එකත්
+          දාලා Save කරන්න.
         </p>
       </div>
 
@@ -188,11 +248,11 @@ export default function AdminAdsPage() {
         </p>
       ) : null}
 
-      <div className="sticky bottom-20 z-20 border border-neutral-200 bg-white p-3 shadow-lg lg:bottom-4">
+      <div className="sticky bottom-4 z-20 rounded-2xl border border-neutral-200 bg-white p-3 shadow-lg">
         <button
           type="submit"
           disabled={busy}
-          className="min-h-12 w-full bg-fh-red font-heading text-base font-bold text-white disabled:opacity-60"
+          className="min-h-12 w-full rounded-full bg-fh-red font-heading text-base font-bold text-white disabled:opacity-60"
         >
           {busy ? "Saving…" : "Save all banners"}
         </button>
