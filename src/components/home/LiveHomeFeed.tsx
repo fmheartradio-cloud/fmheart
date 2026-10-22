@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { HomeAdSlot } from "@/components/ads/HomeAdSlot";
 import { AdvertiseWidget } from "@/components/home/AdvertiseWidget";
 import { HeroSlider } from "@/components/home/HeroSlider";
 import { LiveRadioPlayer } from "@/components/home/LiveRadioPlayer";
 import { MostRead } from "@/components/home/MostRead";
 import { NewsGrid, type NewsCard } from "@/components/home/NewsGrid";
 import { VideosSection } from "@/components/home/VideosSection";
-import { AdSenseUnit } from "@/components/ads/AdSenseUnit";
-import { adSlot } from "@/lib/ads";
 import { HOME_CATEGORY_SECTIONS } from "@/lib/home-category-news";
 import type { Article, VideoItem } from "@/types";
+import type { DirectAdBanner } from "@/types/ads";
 
 const POLL_MS = 45_000;
 
@@ -27,6 +27,9 @@ type HomeFeedPayload = {
 
 type LiveHomeFeedProps = HomeFeedPayload & {
   headerPromo: ReactNode;
+  playerBanner?: DirectAdBanner | null;
+  inFeedBanner?: DirectAdBanner | null;
+  sidebarBanner?: DirectAdBanner | null;
 };
 
 function fingerprint(payload: HomeFeedPayload): string {
@@ -50,6 +53,9 @@ export function LiveHomeFeed({
   business: initialBusiness,
   sports: initialSports,
   headerPromo,
+  playerBanner,
+  inFeedBanner,
+  sidebarBanner,
 }: LiveHomeFeedProps) {
   const [feed, setFeed] = useState<HomeFeedPayload>({
     heroSlides: initialHero,
@@ -136,7 +142,7 @@ export function LiveHomeFeed({
       <div className="grid w-full max-w-full grid-cols-1 gap-0 lg:grid-cols-[1fr_320px]">
         <HeroSlider slides={feed.heroSlides} />
         <div className="min-h-[320px] w-full min-w-0 max-w-full lg:min-h-full">
-          <LiveRadioPlayer />
+          <LiveRadioPlayer playerBanner={playerBanner} />
         </div>
       </div>
 
@@ -154,8 +160,9 @@ export function LiveHomeFeed({
 
       <div className="grid w-full max-w-full grid-cols-1 items-start gap-8 pb-8 lg:grid-cols-[1fr_300px]">
         <div className="min-w-0 max-w-full space-y-10 overflow-x-clip">
-          <AdSenseUnit
-            slot={adSlot("inArticle")}
+          <HomeAdSlot
+            banner={inFeedBanner}
+            adsenseKind="inArticle"
             label="In-Feed Ad"
             className="min-h-[100px]"
           />
@@ -185,9 +192,13 @@ export function LiveHomeFeed({
         <aside className="min-w-0 space-y-5">
           <AdvertiseWidget />
           <MostRead articles={feed.mostRead} />
-          <AdSenseUnit
-            slot={adSlot("sidebar")}
+          <HomeAdSlot
+            banner={sidebarBanner}
+            adsenseKind="sidebar"
             label="Sidebar 300×250"
+            width={300}
+            height={250}
+            format="rectangle"
             className="min-h-[250px]"
           />
           <div className="border border-neutral-200 bg-fh-surface p-4">

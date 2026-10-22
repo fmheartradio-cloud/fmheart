@@ -1,4 +1,4 @@
-import { AdSenseUnit } from "@/components/ads/AdSenseUnit";
+import { HomeAdSlot } from "@/components/ads/HomeAdSlot";
 import { BrandPromo } from "@/components/home/BrandPromo";
 import { HeaderPromo } from "@/components/home/HeaderPromo";
 import { LiveHomeFeed } from "@/components/home/LiveHomeFeed";
@@ -7,9 +7,9 @@ import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
-import { adSlot } from "@/lib/ads";
 import { formatSriLankaDateTime } from "@/lib/datetime";
 import { pickHomeCategoryNews } from "@/lib/home-category-news";
+import { getPublicAds } from "@/services/ads";
 import { cmsToCard, listArticles } from "@/services/articles";
 import { cmsToHeroSlide } from "@/services/hero";
 import { getPublicVideos } from "@/services/videos";
@@ -18,10 +18,11 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function HomePage() {
-  const [allNews, gossip, videos] = await Promise.all([
+  const [allNews, gossip, videos, ads] = await Promise.all([
     listArticles({ type: "news", status: "published", limit: 80 }),
     listArticles({ type: "gossip", status: "published", limit: 9 }),
     getPublicVideos(8),
+    getPublicAds(),
   ]);
 
   const news = allNews.slice(0, 12);
@@ -43,14 +44,14 @@ export default async function HomePage() {
     slug: a.slug,
   }));
 
-  const headerPromo = adSlot("header") ? (
-    <AdSenseUnit
-      slot={adSlot("header")}
+  const headerPromo = (
+    <HomeAdSlot
+      banner={ads.banners.header}
+      adsenseKind="header"
       label="Header Banner"
       className="w-full min-h-[90px]"
+      fallback={<HeaderPromo />}
     />
-  ) : (
-    <HeaderPromo />
   );
 
   return (
@@ -70,15 +71,19 @@ export default async function HomePage() {
             business={business}
             sports={sports}
             headerPromo={headerPromo}
+            playerBanner={ads.banners.player}
+            inFeedBanner={ads.banners.inFeed}
+            sidebarBanner={ads.banners.sidebar}
           />
         </div>
 
-        <MidBannerAd />
+        <MidBannerAd banner={ads.banners.partnerStrip} />
 
         <div className="mx-auto max-w-7xl space-y-8 px-3 py-8 md:px-4">
           <BrandPromo />
-          <AdSenseUnit
-            slot={adSlot("header")}
+          <HomeAdSlot
+            banner={ads.banners.footer}
+            adsenseKind="header"
             label="Before Footer Banner"
             className="min-h-[90px]"
           />

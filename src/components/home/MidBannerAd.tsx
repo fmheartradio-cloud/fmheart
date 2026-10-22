@@ -1,6 +1,24 @@
 import Link from "next/link";
+import { DirectBanner } from "@/components/ads/DirectBanner";
+import { isLiveBanner, type DirectAdBanner } from "@/types/ads";
 
-export function MidBannerAd() {
+export function MidBannerAd({ banner }: { banner?: DirectAdBanner | null }) {
+  if (isLiveBanner(banner)) {
+    return (
+      <section className="bg-fh-black">
+        <div className="mx-auto max-w-7xl">
+          <DirectBanner
+            imageUrl={banner.imageUrl}
+            href={banner.href || "/promotion"}
+            alt={banner.alt || "Partner with FM Heart"}
+            objectFit="contain"
+            className="w-full bg-fh-black"
+          />
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="bg-fh-black px-4 py-8 text-center text-white md:py-10">
       <p className="font-heading text-xs tracking-[0.25em] text-fh-red uppercase">

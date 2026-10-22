@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-session";
+import { getCmsAds, saveAds } from "@/services/ads";
 import {
   getCmsBreakingHeadlines,
   saveBreakingHeadlines,
@@ -7,6 +8,7 @@ import {
 import { getCmsHeroSlides, saveHeroSlides } from "@/services/hero";
 import { getCmsVideos, saveVideos, type VideoInput } from "@/services/videos";
 import type { HeroSlideInput } from "@/services/hero";
+import type { AdsSettings } from "@/types/ads";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +28,10 @@ export async function GET(request: Request) {
     if (key === "breaking") {
       return NextResponse.json({ headlines: await getCmsBreakingHeadlines() });
     }
+    if (key === "ads") {
+      const ads = await getCmsAds();
+      return NextResponse.json({ banners: ads.banners });
+    }
     return NextResponse.json({ error: "Unknown settings key" }, { status: 400 });
   } catch (err) {
     return NextResponse.json(
@@ -44,6 +50,7 @@ export async function PUT(request: Request) {
     items?: VideoInput[];
     slides?: HeroSlideInput[];
     headlines?: string[];
+    banners?: AdsSettings["banners"];
   };
   try {
     body = (await request.json()) as typeof body;
@@ -63,6 +70,10 @@ export async function PUT(request: Request) {
     if (body.key === "breaking") {
       const headlines = await saveBreakingHeadlines(body.headlines || []);
       return NextResponse.json({ headlines });
+    }
+    if (body.key === "ads") {
+      const ads = await saveAds({ banners: body.banners || ({} as AdsSettings["banners"]) });
+      return NextResponse.json({ banners: ads.banners });
     }
     return NextResponse.json({ error: "Unknown settings key" }, { status: 400 });
   } catch (err) {

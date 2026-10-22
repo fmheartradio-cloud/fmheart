@@ -146,6 +146,16 @@ body {
   animation: pulse-live 1.6s ease-in-out infinite;
 }
 
+@keyframes admin-bar {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;

@@ -123,38 +123,38 @@ export default function AdminVideosPage() {
               placeholder="Title"
               value={item.title}
               onChange={(e) => updateItem(i, { title: e.target.value })}
-              className="w-full border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full border border-neutral-300 px-3 py-3 text-base"
             />
             <input
               placeholder="YouTube / video URL (https://youtube.com/watch?v=…)"
               value={item.videoUrl || ""}
               onChange={(e) => updateItem(i, { videoUrl: e.target.value })}
-              className="w-full border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full border border-neutral-300 px-3 py-3 text-base"
             />
             <input
               placeholder="Thumbnail image URL (optional if YouTube URL set)"
               value={item.thumbnail}
               onChange={(e) => updateItem(i, { thumbnail: e.target.value })}
-              className="w-full border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full border border-neutral-300 px-3 py-3 text-base"
             />
             <div className="grid gap-2 sm:grid-cols-3">
               <input
                 placeholder="Duration (12:45)"
                 value={item.duration || ""}
                 onChange={(e) => updateItem(i, { duration: e.target.value })}
-                className="w-full border border-neutral-300 px-3 py-2 text-sm"
+                className="w-full border border-neutral-300 px-3 py-3 text-base"
               />
               <input
                 placeholder="Views (24K)"
                 value={item.views || ""}
                 onChange={(e) => updateItem(i, { views: e.target.value })}
-                className="w-full border border-neutral-300 px-3 py-2 text-sm"
+                className="w-full border border-neutral-300 px-3 py-3 text-base"
               />
               <input
                 placeholder="Slug (optional)"
                 value={item.slug || ""}
                 onChange={(e) => updateItem(i, { slug: e.target.value })}
-                className="w-full border border-neutral-300 px-3 py-2 text-sm"
+                className="w-full border border-neutral-300 px-3 py-3 text-base"
               />
             </div>
           </div>
@@ -164,14 +164,14 @@ export default function AdminVideosPage() {
           <button
             type="button"
             onClick={addItem}
-            className="border border-neutral-300 px-4 py-2.5 font-heading text-sm font-bold text-fh-ink hover:bg-fh-surface"
+            className="min-h-12 flex-1 border border-neutral-300 px-4 font-heading text-sm font-bold text-fh-ink hover:bg-fh-surface sm:flex-none"
           >
             + Add video
           </button>
           <button
             type="submit"
             disabled={busy}
-            className="bg-fh-red px-5 py-2.5 font-heading text-sm font-bold text-white disabled:opacity-60"
+            className="min-h-12 flex-1 bg-fh-red px-5 font-heading text-sm font-bold text-white disabled:opacity-60 sm:flex-none"
           >
             {busy ? "Saving…" : "Save Videos"}
           </button>

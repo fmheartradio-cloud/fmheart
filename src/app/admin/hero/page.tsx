@@ -65,7 +65,7 @@ export default function AdminHeroPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-extrabold md:text-3xl">
-          Hero Posts
+          Banners & Sliders
         </h1>
         <p className="mt-1 text-sm text-fh-muted">
           Homepage slider දැන් නවතම published news 10 ස්වයංක්‍රීයව පෙන්වයි.

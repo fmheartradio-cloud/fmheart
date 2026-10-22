@@ -13,6 +13,22 @@ import type { CmsArticle, CmsArticleInput, ContentType } from "@/types/cms";
 
 const PAGE_SIZE = 10;
 
+const ARTICLE_CATEGORIES = [
+  "දේශීය",
+  "දේශපාලන",
+  "ව්‍යාපාර",
+  "ව්‍යාපාරික",
+  "ක්‍රීඩා",
+  "විදෙස්",
+  "ලෝක පුවත්",
+  "තාක්ෂණය",
+  "සෞඛ්‍ය",
+  "ජීවන රටාව",
+] as const;
+
+const FIELD =
+  "mt-1 w-full border border-neutral-300 bg-white px-3 py-3 text-base outline-none focus:ring-2 focus:ring-fh-red";
+
 const emptyForm: CmsArticleInput = {
   type: "news",
   title: "",
@@ -37,15 +53,24 @@ export default function AdminArticlesPage() {
   const [filter, setFilter] = useState<"all" | "draft" | "published">("all");
   const [page, setPage] = useState(1);
   const [postToFacebook, setPostToFacebook] = useState(true);
+  const [query, setQuery] = useState("");
+  const [panel, setPanel] = useState<"list" | "form">("list");
 
   async function refresh() {
     const items = await listArticles({ status: "all", limit: 200 });
     setArticles(items);
   }
 
-  const visible = articles.filter((a) =>
-    filter === "all" ? true : a.status === filter,
-  );
+  const visible = articles.filter((a) => {
+    if (filter !== "all" && a.status !== filter) return false;
+    if (!query.trim()) return true;
+    const q = query.trim().toLowerCase();
+    return (
+      a.title.toLowerCase().includes(q) ||
+      a.category.toLowerCase().includes(q) ||
+      (a.source || "").toLowerCase().includes(q)
+    );
+  });
   const draftCount = articles.filter((a) => a.status === "draft").length;
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -55,8 +80,15 @@ export default function AdminArticlesPage() {
   );
   const rangeStart = visible.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const rangeEnd = Math.min(currentPage * PAGE_SIZE, visible.length);
+  const categoryOptions = ARTICLE_CATEGORIES.includes(
+    form.category as (typeof ARTICLE_CATEGORIES)[number],
+  )
+    ? ARTICLE_CATEGORIES
+    : ([form.category, ...ARTICLE_CATEGORIES] as readonly string[]);
 
   useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("q");
+    if (q) setQuery(q);
     void refresh();
   }, []);
 
@@ -71,6 +103,13 @@ export default function AdminArticlesPage() {
     } catch (err) {
       return `Facebook failed: ${err instanceof Error ? err.message : "error"}`;
     }
+  }
+
+  function resetForm() {
+    setEditingId(undefined);
+    setForm(emptyForm);
+    setTagInput("");
+    setPostToFacebook(true);
   }
 
   async function handleSave(e: FormEvent) {
@@ -101,16 +140,21 @@ export default function AdminArticlesPage() {
           .filter(Boolean)
           .join(" · "),
       );
-      setForm(emptyForm);
-      setTagInput("");
-      setEditingId(undefined);
-      setPostToFacebook(true);
+      resetForm();
+      setPanel("list");
       await refresh();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Save failed");
     } finally {
       setBusy(false);
     }
+  }
+
+  function startNew() {
+    resetForm();
+    setMessage(null);
+    setPanel("form");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function startEdit(article: CmsArticle) {
@@ -135,58 +179,85 @@ export default function AdminArticlesPage() {
       seoDescription: article.seoDescription,
     });
     setTagInput(article.tags.join(", "));
+    setMessage(null);
+    setPanel("form");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-extrabold md:text-3xl">
-          Articles
-        </h1>
-        <p className="mt-1 text-sm text-fh-muted">
-          Manual posts and newsbot articles. Bot ingests publish automatically;
-          manual drafts stay draft until you Publish.
-          {draftCount > 0 ? ` (${draftCount} drafts waiting)` : ""}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {(
-            [
-              ["all", "All"],
-              ["draft", "Drafts"],
-              ["published", "Published"],
-            ] as const
-          ).map(([key, label]) => (
+    <div className="mx-auto max-w-6xl space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="font-heading text-2xl font-extrabold md:text-3xl">
+            News
+          </h1>
+          <p className="mt-1 text-sm text-fh-muted">
+            ලිපියක් edit කරන්න list එකෙන් tap කරන්න.
+            {draftCount > 0 ? ` ${draftCount} drafts waiting.` : ""}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {panel === "form" ? (
             <button
-              key={key}
               type="button"
               onClick={() => {
-                setFilter(key);
-                setPage(1);
+                resetForm();
+                setPanel("list");
               }}
-              className={`px-3 py-1.5 font-heading text-xs font-bold ${
-                filter === key
-                  ? "bg-fh-red text-white"
-                  : "bg-fh-surface text-fh-ink"
-              }`}
+              className="min-h-11 flex-1 border border-neutral-300 bg-white px-4 font-heading text-sm font-bold sm:flex-none lg:hidden"
             >
-              {label}
+              ← List
             </button>
-          ))}
+          ) : null}
+          <button
+            type="button"
+            onClick={startNew}
+            className="min-h-11 flex-1 bg-fh-red px-4 font-heading text-sm font-bold text-white sm:flex-none"
+          >
+            + New article
+          </button>
         </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+      <div className="flex flex-wrap gap-2">
+        {(
+          [
+            ["all", "All"],
+            ["draft", "Drafts"],
+            ["published", "Published"],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => {
+              setFilter(key);
+              setPage(1);
+            }}
+            className={`min-h-10 px-4 font-heading text-sm font-bold ${
+              filter === key
+                ? "bg-fh-red text-white"
+                : "bg-white text-fh-ink"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         <form
           onSubmit={handleSave}
-          className="space-y-3 border border-neutral-200 bg-white p-5"
+          className={`space-y-3 border border-neutral-200 bg-white p-4 sm:p-5 ${
+            panel === "form" ? "block" : "hidden lg:block"
+          }`}
         >
           <h2 className="font-heading text-lg font-bold">
-            {editingId ? "Edit Article" : "New Article"}
+            {editingId ? "Edit article" : "New article"}
           </h2>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-sm">
+            <label className="text-sm font-semibold">
               Type
               <select
                 value={form.type}
@@ -196,13 +267,13 @@ export default function AdminArticlesPage() {
                     type: e.target.value as ContentType,
                   }))
                 }
-                className="mt-1 w-full border border-neutral-300 px-3 py-2"
+                className={FIELD}
               >
                 <option value="news">News</option>
                 <option value="gossip">Gossip</option>
               </select>
             </label>
-            <label className="text-sm">
+            <label className="text-sm font-semibold">
               Status
               <select
                 value={form.status}
@@ -212,7 +283,7 @@ export default function AdminArticlesPage() {
                     status: e.target.value as CmsArticleInput["status"],
                   }))
                 }
-                className="mt-1 w-full border border-neutral-300 px-3 py-2"
+                className={FIELD}
               >
                 <option value="draft">Draft</option>
                 <option value="published">Published</option>
@@ -221,74 +292,105 @@ export default function AdminArticlesPage() {
             </label>
           </div>
 
-          <input
-            required
-            placeholder="Title (සිංහල)"
-            value={form.title}
-            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-            className="w-full border border-neutral-300 px-3 py-2 text-sm"
-          />
-          <input
-            placeholder="Slug (optional)"
-            value={form.slug}
-            onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-            className="w-full border border-neutral-300 px-3 py-2 text-sm"
-          />
-          <input
-            required
-            placeholder="Category"
-            value={form.category}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, category: e.target.value }))
-            }
-            className="w-full border border-neutral-300 px-3 py-2 text-sm"
-          />
-          <input
-            required
-            placeholder="Cover image URL"
-            value={form.coverImage}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, coverImage: e.target.value }))
-            }
-            className="w-full border border-neutral-300 px-3 py-2 text-sm"
-          />
-          <input
-            placeholder="Author"
-            value={form.author}
-            onChange={(e) => setForm((f) => ({ ...f, author: e.target.value }))}
-            className="w-full border border-neutral-300 px-3 py-2 text-sm"
-          />
-          <textarea
-            required
-            rows={2}
-            placeholder="Excerpt"
-            value={form.excerpt}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, excerpt: e.target.value }))
-            }
-            className="w-full border border-neutral-300 px-3 py-2 text-sm"
-          />
-          <textarea
-            required
-            rows={10}
-            placeholder="Body (සිංහල article)"
-            value={form.body}
-            onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
-            className="w-full border border-neutral-300 px-3 py-2 font-article text-sm"
-          />
-          <input
-            placeholder="Tags (comma separated)"
-            value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
-            className="w-full border border-neutral-300 px-3 py-2 text-sm"
-          />
+          <label className="block text-sm font-semibold">
+            Title (සිංහල)
+            <input
+              required
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              className={FIELD}
+            />
+          </label>
+          <label className="block text-sm font-semibold">
+            Category
+            <select
+              value={form.category}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, category: e.target.value }))
+              }
+              className={FIELD}
+            >
+              {categoryOptions.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm font-semibold">
+            Cover image URL
+            <input
+              required
+              type="url"
+              inputMode="url"
+              value={form.coverImage}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, coverImage: e.target.value }))
+              }
+              className={FIELD}
+            />
+          </label>
+          {form.coverImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={form.coverImage}
+              alt=""
+              className="max-h-36 w-full object-cover"
+            />
+          ) : null}
+          <label className="block text-sm font-semibold">
+            Author
+            <input
+              value={form.author}
+              onChange={(e) => setForm((f) => ({ ...f, author: e.target.value }))}
+              className={FIELD}
+            />
+          </label>
+          <label className="block text-sm font-semibold">
+            Slug (optional)
+            <input
+              value={form.slug}
+              onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+              className={FIELD}
+            />
+          </label>
+          <label className="block text-sm font-semibold">
+            Excerpt
+            <textarea
+              required
+              rows={2}
+              value={form.excerpt}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, excerpt: e.target.value }))
+              }
+              className={FIELD}
+            />
+          </label>
+          <label className="block text-sm font-semibold">
+            Body
+            <textarea
+              required
+              rows={10}
+              value={form.body}
+              onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
+              className={`${FIELD} font-article`}
+            />
+          </label>
+          <label className="block text-sm font-semibold">
+            Tags (comma separated)
+            <input
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              className={FIELD}
+            />
+          </label>
 
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-start gap-3 text-sm">
             <input
               type="checkbox"
               checked={postToFacebook}
               onChange={(e) => setPostToFacebook(e.target.checked)}
-              className="size-4 accent-fh-red"
+              className="mt-0.5 size-5 accent-fh-red"
             />
             <span>
               Post to Facebook when published
@@ -298,90 +400,103 @@ export default function AdminArticlesPage() {
             </span>
           </label>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <button
               type="submit"
               disabled={busy}
-              className="bg-fh-red px-5 py-2.5 font-heading text-sm font-bold text-white disabled:opacity-60"
+              className="min-h-12 flex-1 bg-fh-red px-5 font-heading text-base font-bold text-white disabled:opacity-60"
             >
-              {busy ? "Saving…" : editingId ? "Update" : "Save"}
+              {busy ? "Saving…" : editingId ? "Update article" : "Save article"}
             </button>
-            {editingId && (
+            {editingId ? (
               <button
                 type="button"
-                className="border border-neutral-300 px-4 py-2.5 text-sm"
+                className="min-h-12 border border-neutral-300 px-4 text-sm font-semibold"
                 onClick={() => {
-                  setEditingId(undefined);
-                  setForm(emptyForm);
-                  setTagInput("");
-                  setPostToFacebook(true);
+                  resetForm();
+                  setPanel("list");
                 }}
               >
                 Cancel
               </button>
-            )}
+            ) : null}
           </div>
-          {message && <p className="text-sm text-fh-muted">{message}</p>}
+          {message ? <p className="text-sm text-fh-muted">{message}</p> : null}
         </form>
 
-        <div className="border border-neutral-200 bg-white p-5">
+        <div
+          className={`border border-neutral-200 bg-white p-4 sm:p-5 ${
+            panel === "list" ? "block" : "hidden lg:block"
+          }`}
+        >
           <h2 className="font-heading text-lg font-bold">
             Articles ({visible.length}
             {filter !== "all" ? ` · ${filter}` : ""})
           </h2>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search title / category…"
+            className={`${FIELD} mb-1`}
+          />
           <p className="mt-1 text-xs text-fh-muted">
             Latest {PAGE_SIZE} per page
             {visible.length > 0
               ? ` · ${rangeStart}–${rangeEnd} of ${visible.length}`
               : ""}
           </p>
-          <ul className="mt-4 divide-y divide-neutral-100">
+          <ul className="mt-3 divide-y divide-neutral-100">
             {paged.map((a) => (
-              <li
-                key={a.id}
-                className="flex items-start justify-between gap-3 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-heading text-sm font-bold">
+              <li key={a.id} className="py-3">
+                <button
+                  type="button"
+                  onClick={() => startEdit(a)}
+                  className="w-full text-left"
+                >
+                  <p className="font-heading text-sm font-bold leading-snug">
                     {a.title}
                   </p>
-                  <p className="text-xs text-fh-muted">
+                  <p className="mt-1 text-xs text-fh-muted">
                     {a.type} · {a.status} · {a.category}
                     {a.ingestedBy === "newsbot" ? " · bot" : ""}
                     {a.source ? ` · ${a.source}` : ""} · {a.views || 0} views
                     {a.facebookPostId ? " · FB ✓" : ""}
                   </p>
-                  {a.sourceUrl ? (
-                    <a
-                      href={a.sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[11px] text-fh-red hover:underline"
-                    >
-                      Source link
-                    </a>
-                  ) : null}
-                  {a.facebookPostUrl ? (
-                    <a
-                      href={a.facebookPostUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="ml-2 text-[11px] text-fh-red hover:underline"
-                    >
-                      Facebook post
-                    </a>
-                  ) : null}
-                  {a.facebookPostError ? (
-                    <p className="text-[11px] text-red-600">
-                      FB: {a.facebookPostError}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1 text-xs">
+                </button>
+                {a.sourceUrl ? (
+                  <a
+                    href={a.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-fh-red hover:underline"
+                  >
+                    Source link
+                  </a>
+                ) : null}
+                {a.facebookPostUrl ? (
+                  <a
+                    href={a.facebookPostUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-2 text-[11px] text-fh-red hover:underline"
+                  >
+                    Facebook post
+                  </a>
+                ) : null}
+                {a.facebookPostError ? (
+                  <p className="text-[11px] text-red-600">
+                    FB: {a.facebookPostError}
+                  </p>
+                ) : null}
+                <div className="mt-2 flex flex-wrap gap-2">
                   {a.status === "draft" ? (
                     <button
                       type="button"
-                      className="font-bold text-fh-red"
+                      className="min-h-10 bg-fh-red px-3 font-heading text-xs font-bold text-white"
                       onClick={async () => {
                         try {
                           await setArticleStatus(a.id, "published");
@@ -417,7 +532,7 @@ export default function AdminArticlesPage() {
                   {a.status === "published" ? (
                     <button
                       type="button"
-                      className="font-bold text-fh-red"
+                      className="min-h-10 border border-neutral-300 px-3 font-heading text-xs font-bold"
                       onClick={async () => {
                         try {
                           const fb = await postArticleToFacebook(a.id, {
@@ -441,34 +556,32 @@ export default function AdminArticlesPage() {
                       {a.facebookPostId ? "Repost FB" : "Post FB"}
                     </button>
                   ) : null}
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className="text-fh-red"
-                      onClick={() => startEdit(a)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="text-neutral-500"
-                      onClick={async () => {
-                        if (!confirm("Delete?")) return;
-                        try {
-                          await deleteArticle(a.id);
-                          await refresh();
-                        } catch (err) {
-                          setMessage(
-                            err instanceof Error
-                              ? err.message
-                              : "Delete failed",
-                          );
-                        }
-                      }}
-                    >
-                      Del
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    className="min-h-10 bg-fh-ink px-3 font-heading text-xs font-bold text-white"
+                    onClick={() => startEdit(a)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="min-h-10 px-3 text-xs font-semibold text-neutral-500"
+                    onClick={async () => {
+                      if (!confirm("Delete?")) return;
+                      try {
+                        await deleteArticle(a.id);
+                        await refresh();
+                      } catch (err) {
+                        setMessage(
+                          err instanceof Error
+                            ? err.message
+                            : "Delete failed",
+                        );
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
                 </div>
               </li>
             ))}
@@ -479,7 +592,7 @@ export default function AdminArticlesPage() {
                 type="button"
                 disabled={currentPage <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="border border-neutral-300 px-3 py-1.5 font-heading text-xs font-bold disabled:opacity-40"
+                className="min-h-10 border border-neutral-300 px-4 font-heading text-xs font-bold disabled:opacity-40"
               >
                 Previous
               </button>
@@ -490,7 +603,7 @@ export default function AdminArticlesPage() {
                 type="button"
                 disabled={currentPage >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="bg-fh-red px-3 py-1.5 font-heading text-xs font-bold text-white disabled:opacity-40"
+                className="min-h-10 bg-fh-red px-4 font-heading text-xs font-bold text-white disabled:opacity-40"
               >
                 Next
               </button>

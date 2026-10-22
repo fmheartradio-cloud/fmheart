@@ -3,8 +3,13 @@
 import { useRadio } from "@/context/RadioProvider";
 import { PlayerAd } from "@/components/home/PlayerAd";
 import { RadioSpectrum } from "@/components/home/RadioSpectrum";
+import type { DirectAdBanner } from "@/types/ads";
 
-export function LiveRadioPlayer() {
+export function LiveRadioPlayer({
+  playerBanner,
+}: {
+  playerBanner?: DirectAdBanner | null;
+}) {
   const {
     isPlaying,
     isLoading,
@@ -85,7 +90,7 @@ export function LiveRadioPlayer() {
       </div>
 
       <div className="mt-auto px-2.5 pb-2.5">
-        <PlayerAd />
+        <PlayerAd banner={playerBanner} />
       </div>
     </aside>
   );

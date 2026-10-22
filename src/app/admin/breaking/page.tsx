@@ -59,12 +59,12 @@ export default function AdminBreakingPage() {
           value={breakingText}
           onChange={(e) => setBreakingText(e.target.value)}
           placeholder={"Headline 1\nHeadline 2\nHeadline 3"}
-          className="w-full border border-neutral-300 px-3 py-2 font-sans text-sm"
+          className="w-full border border-neutral-300 px-3 py-3 font-sans text-base"
         />
         <button
           type="submit"
           disabled={breakingBusy}
-          className="bg-fh-red px-5 py-2.5 font-heading text-sm font-bold text-white disabled:opacity-60"
+          className="min-h-12 bg-fh-red px-5 font-heading text-sm font-bold text-white disabled:opacity-60"
         >
           {breakingBusy ? "Saving…" : "Save Breaking News"}
         </button>
