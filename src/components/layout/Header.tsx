@@ -25,33 +25,21 @@ function BrandNowPlaying({
   isPlaying,
   song,
   artist,
-  size = "desktop",
 }: {
   isPlaying: boolean;
   song: string;
   artist?: string;
-  size?: "mobile" | "desktop";
 }) {
   return (
-    <div className="min-w-0 text-center">
-      <p
-        className={`font-sigiri font-extrabold tracking-wide text-fh-ink ${
-          size === "mobile"
-            ? "text-[22px] leading-tight sm:text-[26px]"
-            : "text-[28px] md:text-[30px] lg:text-[34px]"
-        }`}
-      >
+    <div className="min-w-0 flex-1 text-center">
+      <p className="truncate font-sigiri text-[15px] font-extrabold leading-none tracking-wide whitespace-nowrap text-fh-ink sm:text-[20px] md:text-[28px] lg:text-[34px]">
         {SITE.taglineSi}
       </p>
-      <p
-        className={`mt-0.5 truncate text-fh-muted ${
-          size === "mobile" ? "text-[11px]" : "text-xs"
-        }`}
-      >
+      <p className="mt-0.5 truncate text-[9px] text-fh-muted sm:text-[11px] md:text-xs">
         <span className="font-semibold text-fh-red">
           {isPlaying ? "ON AIR" : "NOW PLAYING"}
         </span>
-        <span className="mx-1.5 text-neutral-300">·</span>
+        <span className="mx-1 text-neutral-300 md:mx-1.5">·</span>
         <span>
           {song}
           {artist ? ` — ${artist}` : ""}
@@ -68,20 +56,18 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-neutral-200 bg-white/95 backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center gap-2 px-3 py-2 md:gap-4 md:px-4 md:py-3">
-        <div className="flex min-w-0 shrink-0 items-center">
+      <div className="mx-auto flex max-w-7xl items-center gap-1.5 px-2 py-1.5 sm:gap-2 sm:px-3 md:gap-4 md:px-4 md:py-3">
+        <div className="flex shrink-0 items-center">
           <Logo variant="tagline" />
         </div>
 
-        <div className="hidden min-w-0 flex-1 items-center justify-center px-4 lg:flex">
-          <BrandNowPlaying
-            isPlaying={isPlaying}
-            song={meta.song}
-            artist={meta.artist}
-          />
-        </div>
+        <BrandNowPlaying
+          isPlaying={isPlaying}
+          song={meta.song}
+          artist={meta.artist}
+        />
 
-        <div className="ml-auto flex shrink-0 items-center gap-2 md:gap-3">
+        <div className="flex shrink-0 items-center gap-1.5 md:gap-3">
           <Link
             href="/promotion"
             className="hidden rounded-md border border-neutral-200 px-3 py-2 font-heading text-xs font-bold tracking-wide text-fh-ink transition hover:border-fh-red hover:text-fh-red xl:inline-flex"
@@ -92,17 +78,18 @@ export function Header() {
           <button
             type="button"
             onClick={() => void toggle()}
-            className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-fh-red to-fh-red-dark px-3 py-2 text-white shadow-sm transition hover:brightness-110 md:px-4"
+            className="group inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-fh-red to-fh-red-dark px-2 py-1 text-white shadow-sm transition hover:brightness-110 sm:gap-1.5 sm:px-2.5 sm:py-1.5 md:gap-2 md:px-4 md:py-2"
             aria-label={isPlaying ? "Pause live radio" : "Play live radio"}
           >
             <span
-              className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-white animate-live"
+              className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-white animate-live md:h-2.5 md:w-2.5"
               aria-hidden
             />
-            <span className="font-heading text-sm font-bold tracking-wide md:text-base">
-              {isLoading ? "LOADING…" : isPlaying ? "ON AIR" : "LIVE RADIO"}
+            <span className="font-heading text-[10px] font-bold tracking-wide sm:text-xs md:text-sm lg:text-base">
+              {isLoading ? "…" : isPlaying ? "ON AIR" : "LIVE"}
+              <span className="hidden md:inline"> RADIO</span>
             </span>
-            <span className="hidden text-lg leading-none sm:inline" aria-hidden>
+            <span className="hidden text-lg leading-none md:inline" aria-hidden>
               {isPlaying ? "❚❚" : "▶"}
             </span>
           </button>
@@ -124,15 +111,6 @@ export function Header() {
             </svg>
           </button>
         </div>
-      </div>
-
-      <div className="border-t border-neutral-100 px-3 py-1.5 lg:hidden">
-        <BrandNowPlaying
-          isPlaying={isPlaying}
-          song={meta.song}
-          artist={meta.artist}
-          size="mobile"
-        />
       </div>
 
       {searchOpen && (

@@ -20,7 +20,7 @@ export function Logo({ variant = "full", className = "" }: LogoProps) {
           width={120}
           height={140}
           priority
-          className="h-14 w-auto max-w-[min(100%,88px)] object-contain object-left sm:h-16 sm:max-w-[96px]"
+          className="h-9 w-auto max-w-[52px] object-contain object-left sm:h-14 sm:max-w-[88px] md:h-16 md:max-w-[96px]"
         />
       </Link>
     );
