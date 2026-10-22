@@ -22,7 +22,7 @@ export function LiveRadioPlayer({
   } = useRadio();
 
   return (
-    <aside className="flex h-full w-full flex-col bg-fh-ink text-white">
+    <aside className="flex h-auto min-h-full w-full flex-col bg-fh-ink text-white">
       <div className="shrink-0 border-b border-white/10 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
