@@ -251,7 +251,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <p className="sr-only">{pageTitle}</p>
         </header>
 
-        <main className="flex-1 px-3 py-4 md:px-6 md:py-6">{children}</main>
+        <main className="min-w-0 flex-1 overflow-x-hidden px-3 py-4 md:px-6 md:py-6">
+          {children}
+        </main>
       </div>
     </div>
   );

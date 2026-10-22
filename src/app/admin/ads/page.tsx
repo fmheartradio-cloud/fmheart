@@ -90,7 +90,7 @@ function SlotCard({
   }
 
   return (
-    <section className="rounded-2xl bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-5">
+    <section className="min-w-0 overflow-hidden rounded-2xl bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="font-heading text-lg font-extrabold">{title}</p>
@@ -116,22 +116,22 @@ function SlotCard({
           <p className="text-sm font-semibold text-fh-ink">
             Banner image (local file)
           </p>
-          <div className="mt-1 flex flex-col gap-2 rounded-xl border border-neutral-200 bg-[#f8f9fc] p-3 sm:flex-row sm:items-center">
+          <div className="mt-1 flex min-w-0 flex-col gap-2 rounded-xl border border-neutral-200 bg-[#f8f9fc] p-3 sm:flex-row sm:items-center">
             <input
               ref={fileRef}
               type="file"
               accept="image/*"
               disabled={uploading}
               onChange={onFile}
-              className="min-w-0 flex-1 text-sm file:mr-3 file:rounded-full file:border-0 file:bg-fh-red file:px-4 file:py-2 file:font-heading file:text-sm file:font-bold file:text-white"
+              className="hidden min-w-0 max-w-full flex-1 text-sm file:mr-3 file:rounded-full file:border-0 file:bg-fh-red file:px-4 file:py-2 file:font-heading file:text-sm file:font-bold file:text-white sm:block"
             />
             <button
               type="button"
               disabled={uploading}
               onClick={() => fileRef.current?.click()}
-              className="min-h-11 shrink-0 rounded-full bg-fh-red px-5 font-heading text-sm font-bold text-white disabled:opacity-60"
+              className="min-h-11 w-full shrink-0 rounded-full bg-fh-red px-5 font-heading text-sm font-bold text-white disabled:opacity-60 sm:w-auto"
             >
-              {uploading ? "Uploading…" : "Browse computer"}
+              {uploading ? "Uploading…" : "Choose image"}
             </button>
           </div>
           <p className="mt-1 text-xs text-fh-muted">
@@ -261,7 +261,10 @@ export default function AdminAdsPage() {
   const previewPx = previewId ? HOME_AD_SLOT_PIXELS[previewId] : null;
 
   return (
-    <form onSubmit={handleSave} className="mx-auto max-w-5xl space-y-5 pb-8">
+    <form
+      onSubmit={handleSave}
+      className="mx-auto min-w-0 max-w-5xl space-y-5 overflow-x-hidden pb-24"
+    >
       <div>
         <h1 className="font-heading text-2xl font-extrabold md:text-3xl">
           Ad banners
@@ -283,8 +286,61 @@ export default function AdminAdsPage() {
             View = live page එකේ slot එකට scroll වෙනවා.
           </p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-[720px] w-full text-left text-sm">
+        <div className="divide-y divide-neutral-100 md:hidden">
+          {AD_PAGE_PLACEMENTS.map((row) => {
+            const banner = ads.banners[row.slotId];
+            const live = isLiveBanner(banner);
+            const slot = HOME_AD_SLOTS.find((s) => s.id === row.slotId);
+            return (
+              <article
+                key={`${row.slotId}-${row.page}-${row.path}`}
+                className="space-y-2 px-4 py-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-heading text-sm font-extrabold">
+                      {slot?.name || row.slotId}
+                    </p>
+                    <p className="text-sm text-fh-ink">{row.page}</p>
+                    <p className="text-xs text-fh-muted">{row.location}</p>
+                    <p className="mt-1 text-xs font-semibold text-fh-red">
+                      {slotSizeLabel(row.slotId)}
+                    </p>
+                  </div>
+                  {live ? (
+                    <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700">
+                      On
+                    </span>
+                  ) : (
+                    <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-1 text-xs font-bold text-fh-muted">
+                      Off
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewId(row.slotId)}
+                    className="min-h-10 rounded-full border border-neutral-200 text-xs font-bold"
+                  >
+                    Preview
+                  </button>
+                  <a
+                    href={`${row.path}#${row.hash}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex min-h-10 items-center justify-center rounded-full bg-fh-red text-xs font-bold text-white"
+                  >
+                    View
+                  </a>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
+          <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="bg-[#f4f6fb] text-xs tracking-wide text-fh-muted uppercase">
               <tr>
                 <th className="px-4 py-3 font-semibold">Slot</th>
@@ -301,7 +357,10 @@ export default function AdminAdsPage() {
                 const live = isLiveBanner(banner);
                 const slot = HOME_AD_SLOTS.find((s) => s.id === row.slotId);
                 return (
-                  <tr key={`${row.slotId}-${row.page}-${row.path}`} className="align-top">
+                  <tr
+                    key={`${row.slotId}-${row.page}-${row.path}`}
+                    className="align-top"
+                  >
                     <td className="px-4 py-3 font-semibold text-fh-ink">
                       {slot?.name || row.slotId}
                     </td>
@@ -349,16 +408,16 @@ export default function AdminAdsPage() {
       </section>
 
       {previewId && previewPx ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
           <button
             type="button"
             className="absolute inset-0"
             aria-label="Close preview"
             onClick={() => setPreviewId(null)}
           />
-          <div className="relative z-10 w-full max-w-3xl rounded-2xl bg-white p-5 shadow-2xl">
+          <div className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl sm:rounded-2xl sm:p-5">
             <div className="flex items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <p className="font-heading text-lg font-extrabold">
                   {HOME_AD_SLOTS.find((s) => s.id === previewId)?.name} preview
                 </p>
@@ -369,7 +428,7 @@ export default function AdminAdsPage() {
               <button
                 type="button"
                 onClick={() => setPreviewId(null)}
-                className="rounded-full border border-neutral-200 px-3 py-1.5 text-sm font-bold"
+                className="shrink-0 rounded-full border border-neutral-200 px-3 py-1.5 text-sm font-bold"
               >
                 Close
               </button>
@@ -420,7 +479,7 @@ export default function AdminAdsPage() {
         </p>
       ) : null}
 
-      <div className="sticky bottom-4 z-20 rounded-2xl border border-neutral-200 bg-white p-3 shadow-lg">
+      <div className="sticky bottom-3 z-20 rounded-2xl border border-neutral-200 bg-white/95 p-3 shadow-lg backdrop-blur">
         <button
           type="submit"
           disabled={busy}
