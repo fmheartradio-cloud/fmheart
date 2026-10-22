@@ -55,14 +55,44 @@ export default function AdminArticlesPage() {
   const [postToFacebook, setPostToFacebook] = useState(true);
   const [query, setQuery] = useState("");
   const [panel, setPanel] = useState<"list" | "form">("list");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [pendingDelete, setPendingDelete] = useState<CmsArticle | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function refresh() {
     const items = await listArticles({ status: "all", limit: 200 });
     setArticles(items);
   }
 
+  function matchesCategory(article: CmsArticle, cat: string) {
+    if (cat === "all") return true;
+    if (cat === "gossip") return article.type === "gossip";
+    if (article.type === "gossip") return false;
+    return (article.category || "").trim() === cat;
+  }
+
+  const extraCategories = [
+    ...new Set(
+      articles
+        .filter((a) => a.type === "news")
+        .map((a) => (a.category || "").trim())
+        .filter(
+          (c) =>
+            c && !(ARTICLE_CATEGORIES as readonly string[]).includes(c),
+        ),
+    ),
+  ].sort((a, b) => a.localeCompare(b, "si"));
+
+  const categoryTabs = [
+    { id: "all", label: "All" },
+    { id: "gossip", label: "Gossip" },
+    ...ARTICLE_CATEGORIES.map((id) => ({ id, label: id })),
+    ...extraCategories.map((id) => ({ id, label: id })),
+  ];
+
   const visible = articles.filter((a) => {
     if (filter !== "all" && a.status !== filter) return false;
+    if (!matchesCategory(a, categoryFilter)) return false;
     if (!query.trim()) return true;
     const q = query.trim().toLowerCase();
     return (
@@ -157,8 +187,34 @@ export default function AdminArticlesPage() {
 
   function startNew() {
     resetForm();
+    if (categoryFilter === "gossip") {
+      setForm({ ...emptyForm, type: "gossip", category: "Gossip" });
+    } else if (categoryFilter !== "all") {
+      setForm({ ...emptyForm, category: categoryFilter });
+    }
     setMessage(null);
     setPanel("form");
+  }
+
+  function askDelete(article: CmsArticle) {
+    setPendingDelete(article);
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      await deleteArticle(pendingDelete.id);
+      setMessage("Deleted ✓");
+      setPendingDelete(null);
+      if (editingId === pendingDelete.id) closeForm();
+      await refresh();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Delete failed");
+      setPendingDelete(null);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   function startEdit(article: CmsArticle) {
@@ -188,18 +244,24 @@ export default function AdminArticlesPage() {
   }
 
   useEffect(() => {
-    if (panel !== "form") return;
+    const overlayOpen = panel === "form" || Boolean(pendingDelete);
+    if (!overlayOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") closeForm();
+      if (e.key !== "Escape") return;
+      if (pendingDelete) {
+        setPendingDelete(null);
+        return;
+      }
+      closeForm();
     }
     window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prev;
       window.removeEventListener("keydown", onKey);
     };
-  }, [panel]);
+  }, [panel, pendingDelete]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
@@ -246,6 +308,45 @@ export default function AdminArticlesPage() {
             {label}
           </button>
         ))}
+      </div>
+
+      <div>
+        <p className="mb-2 text-xs font-semibold tracking-wide text-fh-muted uppercase">
+          News category
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {categoryTabs.map((tab) => {
+            const count = articles.filter((a) => {
+              if (filter !== "all" && a.status !== filter) return false;
+              return matchesCategory(a, tab.id);
+            }).length;
+            const active = categoryFilter === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  setCategoryFilter(tab.id);
+                  setPage(1);
+                }}
+                className={`min-h-10 rounded-full px-3 font-heading text-sm font-bold ${
+                  active
+                    ? "bg-fh-ink text-white"
+                    : "bg-white text-fh-ink"
+                }`}
+              >
+                {tab.label}
+                <span
+                  className={`ml-1.5 text-xs font-semibold ${
+                    active ? "text-white/70" : "text-fh-muted"
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {panel === "form" ? (
@@ -445,7 +546,8 @@ export default function AdminArticlesPage() {
       <div className="border border-neutral-200 bg-white p-4 sm:p-5">
           <h2 className="font-heading text-lg font-bold">
             Articles ({visible.length}
-            {filter !== "all" ? ` · ${filter}` : ""})
+            {filter !== "all" ? ` · ${filter}` : ""}
+            {categoryFilter !== "all" ? ` · ${categoryFilter}` : ""})
           </h2>
           <input
             type="search"
@@ -580,19 +682,7 @@ export default function AdminArticlesPage() {
                   <button
                     type="button"
                     className="min-h-10 px-3 text-xs font-semibold text-neutral-500"
-                    onClick={async () => {
-                      if (!confirm("Delete?")) return;
-                      try {
-                        await deleteArticle(a.id);
-                        await refresh();
-                      } catch (err) {
-                        setMessage(
-                          err instanceof Error
-                            ? err.message
-                            : "Delete failed",
-                        );
-                      }
-                    }}
+                    onClick={() => askDelete(a)}
                   >
                     Delete
                   </button>
@@ -624,6 +714,46 @@ export default function AdminArticlesPage() {
             </div>
           ) : null}
       </div>
+
+      {pendingDelete ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <button
+            type="button"
+            className="absolute inset-0"
+            aria-label="Cancel delete"
+            onClick={() => setPendingDelete(null)}
+          />
+          <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+            <h2 className="font-heading text-lg font-extrabold">
+              Delete this article?
+            </h2>
+            <p className="mt-2 text-sm leading-snug text-fh-ink">
+              {pendingDelete.title}
+            </p>
+            <p className="mt-2 text-sm text-fh-muted">
+              Yes එක තේරුවොත් මේ ලිපිය ඉවත් වෙනවා. No එකෙන් cancel වෙනවා.
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setPendingDelete(null)}
+                className="min-h-12 rounded-full border border-neutral-300 font-heading text-sm font-bold disabled:opacity-60"
+              >
+                No
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => void confirmDelete()}
+                className="min-h-12 rounded-full bg-fh-red font-heading text-sm font-bold text-white disabled:opacity-60"
+              >
+                {deleting ? "Deleting…" : "Yes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
