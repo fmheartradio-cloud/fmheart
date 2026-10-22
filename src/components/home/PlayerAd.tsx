@@ -13,7 +13,6 @@ export function PlayerAd({ banner }: { banner?: DirectAdBanner | null }) {
     <div className="flex justify-center">
       <HomeAdSlot
         banner={banner}
-        adsenseKind="player"
         label={`Player ${PLAYER_AD.width}×${PLAYER_AD.height}`}
         width={PLAYER_AD.width}
         height={PLAYER_AD.height}
