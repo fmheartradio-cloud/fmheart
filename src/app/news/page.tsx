@@ -1,13 +1,13 @@
 ﻿import type { Metadata } from "next";
 import Link from "next/link";
-import { AdSenseUnit } from "@/components/ads/AdSenseUnit";
+import { CmsPageAd } from "@/components/ads/CmsPageAd";
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
 import { CoverImage } from "@/components/ui/CoverImage";
 import { MixedScriptText } from "@/components/ui/MixedScriptText";
-import { adSlot } from "@/lib/ads";
+import { getPublicAds } from "@/services/ads";
 import { listArticles } from "@/services/articles";
 
 export const dynamic = "force-dynamic";
@@ -57,7 +57,10 @@ export default async function NewsPage({
     : params.category;
   const selectedCategory = normalizeCategory(categoryValue);
 
-  const allNews = await listArticles({ type: "news", limit: 200 });
+  const [allNews, ads] = await Promise.all([
+    listArticles({ type: "news", limit: 200 }),
+    getPublicAds(),
+  ]);
   const articles = selectedCategory
     ? selectedCategory === "විදෙස්"
       ? allNews.filter(isAdaDeranaForeignArticle)
@@ -114,10 +117,11 @@ export default async function NewsPage({
           </Link>
         </div>
 
-        <AdSenseUnit
-          slot={adSlot("header")}
+        <CmsPageAd
+          slotId="header"
+          banner={ads.banners.header}
           label="News Header Banner"
-          className="mt-6 min-h-[90px]"
+          className="mt-6"
         />
 
         {articles.length === 0 ? (

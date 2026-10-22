@@ -150,11 +150,15 @@ export default function AdminArticlesPage() {
     }
   }
 
+  function closeForm() {
+    resetForm();
+    setPanel("list");
+  }
+
   function startNew() {
     resetForm();
     setMessage(null);
     setPanel("form");
-    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function startEdit(article: CmsArticle) {
@@ -181,8 +185,21 @@ export default function AdminArticlesPage() {
     setTagInput(article.tags.join(", "));
     setMessage(null);
     setPanel("form");
-    window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
+  useEffect(() => {
+    if (panel !== "form") return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") closeForm();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [panel]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
@@ -196,27 +213,13 @@ export default function AdminArticlesPage() {
             {draftCount > 0 ? ` ${draftCount} drafts waiting.` : ""}
           </p>
         </div>
-        <div className="flex gap-2">
-          {panel === "form" ? (
-            <button
-              type="button"
-              onClick={() => {
-                resetForm();
-                setPanel("list");
-              }}
-              className="min-h-11 flex-1 border border-neutral-300 bg-white px-4 font-heading text-sm font-bold sm:flex-none lg:hidden"
-            >
-              ← List
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={startNew}
-            className="min-h-11 flex-1 bg-fh-red px-4 font-heading text-sm font-bold text-white sm:flex-none"
-          >
-            + New article
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={startNew}
+          className="min-h-11 bg-fh-red px-4 font-heading text-sm font-bold text-white sm:self-end"
+        >
+          + New article
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -245,16 +248,30 @@ export default function AdminArticlesPage() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-        <form
-          onSubmit={handleSave}
-          className={`space-y-3 border border-neutral-200 bg-white p-4 sm:p-5 ${
-            panel === "form" ? "block" : "hidden lg:block"
-          }`}
-        >
-          <h2 className="font-heading text-lg font-bold">
-            {editingId ? "Edit article" : "New article"}
-          </h2>
+      {panel === "form" ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:p-6">
+          <button
+            type="button"
+            className="absolute inset-0"
+            aria-label="Close article form"
+            onClick={closeForm}
+          />
+          <form
+            onSubmit={handleSave}
+            className="relative z-10 my-4 w-full max-w-2xl space-y-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-2xl sm:p-5"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="font-heading text-lg font-bold">
+                {editingId ? "Edit article" : "New article"}
+              </h2>
+              <button
+                type="button"
+                onClick={closeForm}
+                className="rounded-full border border-neutral-300 px-3 py-1.5 text-sm font-semibold"
+              >
+                Close
+              </button>
+            </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm font-semibold">
@@ -408,27 +425,24 @@ export default function AdminArticlesPage() {
             >
               {busy ? "Saving…" : editingId ? "Update article" : "Save article"}
             </button>
-            {editingId ? (
-              <button
-                type="button"
-                className="min-h-12 border border-neutral-300 px-4 text-sm font-semibold"
-                onClick={() => {
-                  resetForm();
-                  setPanel("list");
-                }}
-              >
-                Cancel
-              </button>
-            ) : null}
+            <button
+              type="button"
+              className="min-h-12 border border-neutral-300 px-4 text-sm font-semibold"
+              onClick={closeForm}
+            >
+              Cancel
+            </button>
           </div>
           {message ? <p className="text-sm text-fh-muted">{message}</p> : null}
-        </form>
+          </form>
+        </div>
+      ) : null}
 
-        <div
-          className={`border border-neutral-200 bg-white p-4 sm:p-5 ${
-            panel === "list" ? "block" : "hidden lg:block"
-          }`}
-        >
+      {message && panel === "list" ? (
+        <p className="text-sm text-fh-muted">{message}</p>
+      ) : null}
+
+      <div className="border border-neutral-200 bg-white p-4 sm:p-5">
           <h2 className="font-heading text-lg font-bold">
             Articles ({visible.length}
             {filter !== "all" ? ` · ${filter}` : ""})
@@ -609,7 +623,6 @@ export default function AdminArticlesPage() {
               </button>
             </div>
           ) : null}
-        </div>
       </div>
     </div>
   );

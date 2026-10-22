@@ -21,6 +21,7 @@ export function PlayerAd({ banner }: { banner?: DirectAdBanner | null }) {
         format="rectangle"
         responsive={false}
         className="overflow-hidden bg-white"
+        anchorId="ad-player"
         fallback={
           <Link
             href="/promotion"

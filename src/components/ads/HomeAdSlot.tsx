@@ -18,6 +18,7 @@ type HomeAdSlotProps = {
   responsive?: boolean;
   fallback?: ReactNode;
   objectFit?: "cover" | "contain";
+  anchorId?: string;
 };
 
 export function HomeAdSlot({
@@ -32,9 +33,13 @@ export function HomeAdSlot({
   responsive = true,
   fallback,
   objectFit = "contain",
+  anchorId,
 }: HomeAdSlotProps) {
+  const wrap = (node: ReactNode) =>
+    anchorId ? <div id={anchorId}>{node}</div> : node;
+
   if (isLiveBanner(banner)) {
-    return (
+    return wrap(
       <DirectBanner
         imageUrl={banner.imageUrl}
         href={banner.href || "/promotion"}
@@ -50,7 +55,7 @@ export function HomeAdSlot({
 
   const slot = adsenseKind ? adSlot(adsenseKind) : undefined;
   if (slot) {
-    return (
+    return wrap(
       <AdSenseUnit
         slot={slot}
         label={label}
@@ -59,13 +64,13 @@ export function HomeAdSlot({
         height={height}
         format={format}
         responsive={responsive}
-      />
+      />,
     );
   }
 
-  if (fallback) return fallback;
+  if (fallback) return wrap(fallback);
 
-  return (
+  return wrap(
     <AdSenseUnit
       label={label}
       className={className}
@@ -73,6 +78,6 @@ export function HomeAdSlot({
       height={height}
       format={format}
       responsive={responsive}
-    />
+    />,
   );
 }

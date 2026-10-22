@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArticleViewTracker } from "@/components/analytics/ArticleViewTracker";
-import { AdSenseUnit } from "@/components/ads/AdSenseUnit";
+import { CmsPageAd } from "@/components/ads/CmsPageAd";
 import { MostRead } from "@/components/home/MostRead";
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
@@ -12,9 +12,9 @@ import { ArticleJsonLd } from "@/components/seo/JsonLd";
 import { CoverImage } from "@/components/ui/CoverImage";
 import { MixedScriptText } from "@/components/ui/MixedScriptText";
 import { ShareButtons } from "@/components/ui/ShareButtons";
-import { adSlot } from "@/lib/ads";
 import { formatSriLankaDateTime } from "@/lib/datetime";
 import { SITE } from "@/lib/site";
+import { getPublicAds } from "@/services/ads";
 import { getArticleBySlug, listArticles } from "@/services/articles";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -60,9 +60,11 @@ export default async function NewsArticlePage({ params }: Props) {
     // ignore
   }
 
-  const latest = (await listArticles({ type: "news", limit: 12 })).filter(
-    (a) => a.slug !== article.slug,
-  );
+  const [latestRaw, ads] = await Promise.all([
+    listArticles({ type: "news", limit: 12 }),
+    getPublicAds(),
+  ]);
+  const latest = latestRaw.filter((a) => a.slug !== article.slug);
   const mostReadCards = latest.slice(0, 5).map((a) => ({
     id: a.id,
     title: a.title,
@@ -138,21 +140,25 @@ export default async function NewsArticlePage({ params }: Props) {
                 : ""}
             </p>
 
-            <AdSenseUnit
-              slot={adSlot("header")}
-              label="After Featured Image"
-              className="mt-5 min-h-[90px]"
-            />
+            <div className="mt-5">
+              <CmsPageAd
+                slotId="header"
+                banner={ads.banners.header}
+                label="After Featured Image"
+              />
+            </div>
 
             <div className="prose-article mt-6 space-y-4 text-justify font-article text-lg leading-8 text-fh-ink whitespace-pre-line">
               {article.body}
             </div>
 
-            <AdSenseUnit
-              slot={adSlot("inArticle")}
-              label="In-Article Ad"
-              className="my-8 min-h-[90px]"
-            />
+            <div className="my-8">
+              <CmsPageAd
+                slotId="inFeed"
+                banner={ads.banners.inFeed}
+                label="In-Article Ad"
+              />
+            </div>
 
             <ShareButtons url={url} title={article.title} />
           </article>
@@ -197,10 +203,10 @@ export default async function NewsArticlePage({ params }: Props) {
               </section>
             ) : null}
 
-            <AdSenseUnit
-              slot={adSlot("sidebar")}
+            <CmsPageAd
+              slotId="sidebar"
+              banner={ads.banners.sidebar}
               label="Sidebar 300×250"
-              className="min-h-[250px]"
             />
           </aside>
         </div>

@@ -39,7 +39,7 @@ function SidebarBody({
         </div>
       </div>
 
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-3">
+      <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 pb-3">
         {ADMIN_NAV.map((item) => {
           const active = isAdminNavActive(pathname, item.href, item.exact);
           return (
@@ -60,16 +60,15 @@ function SidebarBody({
         })}
       </nav>
 
-      <div className="mt-auto px-4 pb-5">
-        <p className="mb-2 text-[11px] text-white/45">Visit Website</p>
+      <div className="shrink-0 border-t border-white/10 px-4 py-4">
         <Link
           href="/"
           onClick={onNavigate}
-          className="flex min-h-11 items-center justify-center rounded-full border border-white/20 text-sm font-semibold text-white/90 hover:bg-white/10"
+          className="flex min-h-10 items-center justify-center rounded-full border border-white/20 text-sm font-semibold text-white/90 hover:bg-white/10"
         >
           fmheart.lk
         </Link>
-        <p className="mt-3 truncate text-[11px] text-white/40">{email}</p>
+        <p className="mt-2 truncate text-[11px] text-white/40">{email}</p>
         <button
           type="button"
           onClick={onLogout}
@@ -77,11 +76,6 @@ function SidebarBody({
         >
           Logout
         </button>
-        <p className="mt-6 font-heading text-[11px] leading-relaxed tracking-[0.2em] text-white/25 uppercase">
-          Music · News
-          <br />
-          Talks · Life
-        </p>
       </div>
     </>
   );
@@ -128,7 +122,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-[#f4f6fb] lg:flex">
       <aside
-        className="hidden w-[260px] shrink-0 flex-col text-white lg:flex"
+        className="sticky top-0 hidden h-screen w-[260px] shrink-0 flex-col self-start overflow-hidden text-white lg:flex"
         style={{
           background:
             "linear-gradient(180deg, #5b0a16 0%, #2b050c 42%, #120308 100%)",
@@ -150,7 +144,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             onClick={() => setMenuOpen(false)}
           />
           <aside
-            className="absolute inset-y-0 left-0 flex w-[280px] max-w-[86vw] flex-col text-white shadow-2xl"
+            className="absolute inset-y-0 left-0 flex w-[280px] max-w-[86vw] flex-col overflow-hidden text-white shadow-2xl"
             style={{
               background:
                 "linear-gradient(180deg, #5b0a16 0%, #2b050c 42%, #120308 100%)",

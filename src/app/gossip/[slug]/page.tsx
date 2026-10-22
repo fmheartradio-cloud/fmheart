@@ -3,15 +3,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArticleViewTracker } from "@/components/analytics/ArticleViewTracker";
-import { AdSenseUnit } from "@/components/ads/AdSenseUnit";
+import { CmsPageAd } from "@/components/ads/CmsPageAd";
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
 import { ArticleJsonLd } from "@/components/seo/JsonLd";
 import { MixedScriptText } from "@/components/ui/MixedScriptText";
-import { adSlot } from "@/lib/ads";
 import { SITE } from "@/lib/site";
+import { getPublicAds } from "@/services/ads";
 import { getArticleBySlug, listArticles } from "@/services/articles";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -44,6 +44,7 @@ export default async function GossipArticlePage({ params }: Props) {
   const { slug } = await params;
   const article = await getArticleBySlug(slug);
   if (!article || article.type !== "gossip") notFound();
+  const ads = await getPublicAds();
 
   const url = `${SITE.url}/gossip/${article.slug}`;
 
@@ -83,13 +84,22 @@ export default async function GossipArticlePage({ params }: Props) {
             sizes="800px"
           />
         </div>
-        <AdSenseUnit
-          slot={adSlot("inArticle")}
-          label="Gossip In-Article"
-          className="mt-6 min-h-[90px]"
-        />
+        <div className="mt-6">
+          <CmsPageAd
+            slotId="header"
+            banner={ads.banners.header}
+            label="Gossip Header Banner"
+          />
+        </div>
         <div className="prose-article mt-6 text-justify font-article text-lg leading-8 whitespace-pre-line">
           {article.body}
+        </div>
+        <div className="mt-6">
+          <CmsPageAd
+            slotId="inFeed"
+            banner={ads.banners.inFeed}
+            label="Gossip In-Article"
+          />
         </div>
       </main>
       <Footer />

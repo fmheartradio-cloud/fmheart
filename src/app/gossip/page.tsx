@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { AdSenseUnit } from "@/components/ads/AdSenseUnit";
+import { CmsPageAd } from "@/components/ads/CmsPageAd";
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
 import { MixedScriptText } from "@/components/ui/MixedScriptText";
-import { adSlot } from "@/lib/ads";
+import { getPublicAds } from "@/services/ads";
 import { listArticles } from "@/services/articles";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,10 @@ export const metadata: Metadata = {
 };
 
 export default async function GossipPage() {
-  const articles = await listArticles({ type: "gossip", limit: 24 });
+  const [articles, ads] = await Promise.all([
+    listArticles({ type: "gossip", limit: 24 }),
+    getPublicAds(),
+  ]);
 
   return (
     <div className="min-h-screen pb-16 md:pb-0">
@@ -33,10 +36,11 @@ export default async function GossipPage() {
           Film · Tele Drama · TikTok · Celebrities · Lifestyle
         </p>
 
-        <AdSenseUnit
-          slot={adSlot("header")}
+        <CmsPageAd
+          slotId="header"
+          banner={ads.banners.header}
           label="Gossip Header Banner"
-          className="mt-6 min-h-[90px]"
+          className="mt-6"
         />
 
         <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

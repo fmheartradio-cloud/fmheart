@@ -145,8 +145,14 @@ export function AdminAuthGate({ children }: { children: ReactNode }) {
           </form>
 
           <Link
-            href="/"
+            href="/dj"
             className="mt-6 text-center text-sm text-neutral-400 hover:text-white"
+          >
+            DJ login →
+          </Link>
+          <Link
+            href="/"
+            className="mt-2 text-center text-sm text-neutral-400 hover:text-white"
           >
             ← Back to fmheart.lk
           </Link>

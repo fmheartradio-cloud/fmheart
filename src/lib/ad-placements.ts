@@ -106,6 +106,108 @@ export function slotSizeLabel(id: HomeAdSlotDefId): string {
   return `${width} × ${height}`;
 }
 
+/** Where each CMS banner actually appears — used by Ad Management table. */
+export const AD_PAGE_PLACEMENTS = [
+  {
+    slotId: "player" as HomeAdSlotDefId,
+    page: "Home",
+    path: "/",
+    hash: "ad-player",
+    location: "Live radio box ඇතුළේ",
+  },
+  {
+    slotId: "header" as HomeAdSlotDefId,
+    page: "Home",
+    path: "/",
+    hash: "ad-header",
+    location: "Hero + radio ට පහළින්",
+  },
+  {
+    slotId: "header" as HomeAdSlotDefId,
+    page: "News",
+    path: "/news",
+    hash: "ad-header",
+    location: "News list ට ඉහළින්",
+  },
+  {
+    slotId: "header" as HomeAdSlotDefId,
+    page: "Gossip",
+    path: "/gossip",
+    hash: "ad-header",
+    location: "Gossip list ට ඉහළින්",
+  },
+  {
+    slotId: "header" as HomeAdSlotDefId,
+    page: "Live",
+    path: "/live",
+    hash: "ad-header",
+    location: "Live player ට පහළින්",
+  },
+  {
+    slotId: "inFeed" as HomeAdSlotDefId,
+    page: "Home",
+    path: "/",
+    hash: "ad-inFeed",
+    location: "News grid ට පහළින්",
+  },
+  {
+    slotId: "header" as HomeAdSlotDefId,
+    page: "News article",
+    path: "/news",
+    hash: "ad-header",
+    location: "Cover image ට පහළින්",
+  },
+  {
+    slotId: "header" as HomeAdSlotDefId,
+    page: "Gossip article",
+    path: "/gossip",
+    hash: "ad-header",
+    location: "Cover image ට පහළින්",
+  },
+  {
+    slotId: "inFeed" as HomeAdSlotDefId,
+    page: "News article",
+    path: "/news",
+    hash: "ad-inFeed",
+    location: "Article body ඇතුළේ",
+  },
+  {
+    slotId: "inFeed" as HomeAdSlotDefId,
+    page: "Gossip article",
+    path: "/gossip",
+    hash: "ad-inFeed",
+    location: "Gossip article body ඇතුළේ",
+  },
+  {
+    slotId: "sidebar" as HomeAdSlotDefId,
+    page: "Home",
+    path: "/",
+    hash: "ad-sidebar",
+    location: "දකුණු sidebar",
+  },
+  {
+    slotId: "sidebar" as HomeAdSlotDefId,
+    page: "News article",
+    path: "/news",
+    hash: "ad-sidebar",
+    location: "Article දකුණු තීරුව",
+  },
+  {
+    slotId: "footer" as HomeAdSlotDefId,
+    page: "Home",
+    path: "/",
+    hash: "ad-footer",
+    location: "Footer ට ඉහළින්",
+  },
+  {
+    slotId: "partnerStrip" as HomeAdSlotDefId,
+    page: "Home",
+    path: "/",
+    hash: "ad-partnerStrip",
+    location: "News section ට පහළ black band",
+  },
+] as const;
+
 export const PROMOTION_PACKAGES = [
   {
     title: "Website Banners",

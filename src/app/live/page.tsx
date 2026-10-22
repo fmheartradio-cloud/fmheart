@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { AdSenseUnit } from "@/components/ads/AdSenseUnit";
+import { CmsPageAd } from "@/components/ads/CmsPageAd";
 import { LiveHeroControls } from "@/components/home/LiveHeroControls";
 import { LiveRadioPlayer } from "@/components/home/LiveRadioPlayer";
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { TopBar } from "@/components/layout/TopBar";
-import { adSlot } from "@/lib/ads";
+import { getPublicAds } from "@/services/ads";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -32,7 +32,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function LivePage() {
+export default async function LivePage() {
+  const ads = await getPublicAds();
   return (
     <div className="min-h-screen pb-16 md:pb-0">
       <TopBar />
@@ -63,10 +64,10 @@ export default function LivePage() {
         </section>
 
         <div className="mx-auto max-w-7xl space-y-8 px-4 py-10">
-          <AdSenseUnit
-            slot={adSlot("header")}
+          <CmsPageAd
+            slotId="header"
+            banner={ads.banners.header}
             label="Live Page Banner"
-            className="min-h-[90px]"
           />
           <div className="grid gap-6 md:grid-cols-3">
             {[

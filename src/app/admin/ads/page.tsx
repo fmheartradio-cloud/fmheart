@@ -7,13 +7,23 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react";
-import { HOME_AD_SLOT_PIXELS, HOME_AD_SLOTS } from "@/lib/ad-placements";
+import {
+  AD_PAGE_PLACEMENTS,
+  HOME_AD_SLOT_PIXELS,
+  HOME_AD_SLOTS,
+  slotSizeLabel,
+} from "@/lib/ad-placements";
 import {
   emptyAdsSettings,
   getCmsAds,
   saveAds,
 } from "@/services/ads";
-import type { AdsSettings, DirectAdBanner, HomeAdSlotId } from "@/types/ads";
+import {
+  isLiveBanner,
+  type AdsSettings,
+  type DirectAdBanner,
+  type HomeAdSlotId,
+} from "@/types/ads";
 
 const FIELD =
   "mt-1 w-full rounded-xl border border-neutral-200 bg-white px-3 py-3 text-base outline-none focus:ring-2 focus:ring-fh-red";
@@ -192,7 +202,7 @@ function SlotCard({
       ) : (
         <p className="mt-4 text-sm text-fh-muted">
           Upload කරලා හෝ URL එකක් දැම්මාම preview එක පෙන්වනවා. Enable + Save
-          කරාම homepage එකේ මේ slot එකට යනවා.
+          කරාම homepage සහ inner pages එකේ මේ slot එකට යනවා.
         </p>
       )}
     </section>
@@ -204,6 +214,7 @@ export default function AdminAdsPage() {
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [previewId, setPreviewId] = useState<HomeAdSlotId | null>(null);
 
   useEffect(() => {
     void getCmsAds()
@@ -234,7 +245,7 @@ export default function AdminAdsPage() {
     try {
       const saved = await saveAds(ads);
       setAds(saved);
-      setMsg("Ad banners saved ✓ — homepage එකේ දැන් පෙන්වනවා.");
+      setMsg("Ad banners saved ✓ — homepage සහ inner pages එකේ දැන් පෙන්වනවා.");
     } catch (err) {
       setMsg(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -246,8 +257,11 @@ export default function AdminAdsPage() {
     return <p className="text-sm text-fh-muted">Loading ad banners…</p>;
   }
 
+  const previewBanner = previewId ? ads.banners[previewId] : null;
+  const previewPx = previewId ? HOME_AD_SLOT_PIXELS[previewId] : null;
+
   return (
-    <form onSubmit={handleSave} className="mx-auto max-w-3xl space-y-5 pb-8">
+    <form onSubmit={handleSave} className="mx-auto max-w-5xl space-y-5 pb-8">
       <div>
         <h1 className="font-heading text-2xl font-extrabold md:text-3xl">
           Ad banners
@@ -258,6 +272,132 @@ export default function AdminAdsPage() {
           එකටම design කරන්න — phone එකේත් desktop එකේත් ratio එක same.
         </p>
       </div>
+
+      <section className="overflow-hidden rounded-2xl bg-white shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+        <div className="border-b border-neutral-100 px-4 py-3 sm:px-5">
+          <h2 className="font-heading text-lg font-extrabold">
+            Where ads show
+          </h2>
+          <p className="mt-0.5 text-sm text-fh-muted">
+            Inner pages ඇතුළුව banner එක පෙන්වන තැන්. Preview = CMS image.
+            View = live page එකේ slot එකට scroll වෙනවා.
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-[720px] w-full text-left text-sm">
+            <thead className="bg-[#f4f6fb] text-xs tracking-wide text-fh-muted uppercase">
+              <tr>
+                <th className="px-4 py-3 font-semibold">Slot</th>
+                <th className="px-4 py-3 font-semibold">Page</th>
+                <th className="px-4 py-3 font-semibold">Location</th>
+                <th className="px-4 py-3 font-semibold">Size</th>
+                <th className="px-4 py-3 font-semibold">Status</th>
+                <th className="px-4 py-3 font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-100">
+              {AD_PAGE_PLACEMENTS.map((row) => {
+                const banner = ads.banners[row.slotId];
+                const live = isLiveBanner(banner);
+                const slot = HOME_AD_SLOTS.find((s) => s.id === row.slotId);
+                return (
+                  <tr key={`${row.slotId}-${row.page}-${row.path}`} className="align-top">
+                    <td className="px-4 py-3 font-semibold text-fh-ink">
+                      {slot?.name || row.slotId}
+                    </td>
+                    <td className="px-4 py-3">{row.page}</td>
+                    <td className="px-4 py-3 text-fh-muted">{row.location}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {slotSizeLabel(row.slotId)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {live ? (
+                        <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700">
+                          On
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs font-bold text-fh-muted">
+                          Off
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewId(row.slotId)}
+                          className="rounded-full border border-neutral-200 px-3 py-1.5 text-xs font-bold"
+                        >
+                          Preview
+                        </button>
+                        <a
+                          href={`${row.path}#${row.hash}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-full bg-fh-red px-3 py-1.5 text-xs font-bold text-white"
+                        >
+                          View
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {previewId && previewPx ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <button
+            type="button"
+            className="absolute inset-0"
+            aria-label="Close preview"
+            onClick={() => setPreviewId(null)}
+          />
+          <div className="relative z-10 w-full max-w-3xl rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-heading text-lg font-extrabold">
+                  {HOME_AD_SLOTS.find((s) => s.id === previewId)?.name} preview
+                </p>
+                <p className="text-sm text-fh-muted">
+                  {slotSizeLabel(previewId)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewId(null)}
+                className="rounded-full border border-neutral-200 px-3 py-1.5 text-sm font-bold"
+              >
+                Close
+              </button>
+            </div>
+            {previewBanner?.imageUrl ? (
+              <div
+                className="mt-4 overflow-hidden bg-neutral-50"
+                style={{
+                  width: "100%",
+                  aspectRatio: `${previewPx.width} / ${previewPx.height}`,
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previewBanner.imageUrl}
+                  alt={previewBanner.alt || previewId}
+                  className="h-full w-full object-contain"
+                />
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-fh-muted">
+                මේ slot එකට banner image එකක් නැහැ. පහළින් upload කරලා Save
+                කරන්න.
+              </p>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {HOME_AD_SLOTS.map((slot) => (
         <SlotCard

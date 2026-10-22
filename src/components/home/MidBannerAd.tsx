@@ -6,7 +6,7 @@ import { isLiveBanner, type DirectAdBanner } from "@/types/ads";
 export function MidBannerAd({ banner }: { banner?: DirectAdBanner | null }) {
   if (isLiveBanner(banner)) {
     return (
-      <section className="bg-fh-black">
+      <section id="ad-partnerStrip" className="bg-fh-black">
         <div className="mx-auto max-w-7xl">
           <DirectBanner
             imageUrl={banner.imageUrl}
@@ -24,7 +24,7 @@ export function MidBannerAd({ banner }: { banner?: DirectAdBanner | null }) {
   }
 
   return (
-    <section className="bg-fh-black px-4 py-8 text-center text-white md:py-10">
+    <section id="ad-partnerStrip" className="bg-fh-black px-4 py-8 text-center text-white md:py-10">
       <p className="font-heading text-xs tracking-[0.25em] text-fh-red uppercase">
         Partner With FM Heart
       </p>

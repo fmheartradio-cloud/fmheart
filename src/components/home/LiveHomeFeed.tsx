@@ -169,6 +169,7 @@ export function LiveHomeFeed({
             height={HOME_AD_SLOT_PIXELS.inFeed.height}
             fill={HOME_AD_SLOT_PIXELS.inFeed.fill}
             className="bg-neutral-100"
+            anchorId="ad-inFeed"
           />
 
           <NewsGrid
@@ -205,6 +206,7 @@ export function LiveHomeFeed({
             fill={HOME_AD_SLOT_PIXELS.sidebar.fill}
             format="rectangle"
             className="bg-neutral-100"
+            anchorId="ad-sidebar"
           />
           <div className="border border-neutral-200 bg-fh-surface p-4">
             <p className="font-heading text-sm font-bold">WhatsApp Channel</p>

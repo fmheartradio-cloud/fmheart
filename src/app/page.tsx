@@ -58,6 +58,7 @@ export default async function HomePage() {
       fill={headerPx.fill}
       className="w-full bg-neutral-100"
       fallback={<HeaderPromo />}
+      anchorId="ad-header"
     />
   );
 
@@ -96,6 +97,7 @@ export default async function HomePage() {
             height={footerPx.height}
             fill={footerPx.fill}
             className="w-full bg-neutral-100"
+            anchorId="ad-footer"
           />
         </div>
       </main>
