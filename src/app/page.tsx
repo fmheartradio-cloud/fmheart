@@ -49,7 +49,10 @@ export default async function HomePage() {
       banner={ads.banners.header}
       adsenseKind="header"
       label="Header Banner"
-      className="w-full min-h-[90px]"
+      width={728}
+      height={90}
+      fill
+      className="w-full bg-neutral-100"
       fallback={<HeaderPromo />}
     />
   );
@@ -85,7 +88,10 @@ export default async function HomePage() {
             banner={ads.banners.footer}
             adsenseKind="header"
             label="Before Footer Banner"
-            className="min-h-[90px]"
+            width={728}
+            height={90}
+            fill
+            className="w-full bg-neutral-100"
           />
         </div>
       </main>

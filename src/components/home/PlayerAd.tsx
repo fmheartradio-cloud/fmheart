@@ -18,7 +18,7 @@ export function PlayerAd({ banner }: { banner?: DirectAdBanner | null }) {
         height={PLAYER_AD.height}
         format="rectangle"
         responsive={false}
-        className="min-h-0 overflow-hidden bg-white"
+        className="overflow-hidden bg-white"
         fallback={
           <Link
             href="/promotion"

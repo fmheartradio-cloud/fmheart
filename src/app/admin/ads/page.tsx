@@ -7,7 +7,7 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react";
-import { HOME_AD_SLOTS } from "@/lib/ad-placements";
+import { HOME_AD_SLOT_PIXELS, HOME_AD_SLOTS } from "@/lib/ad-placements";
 import {
   emptyAdsSettings,
   getCmsAds,
@@ -170,14 +170,24 @@ function SlotCard({
       {banner.imageUrl ? (
         <div className="mt-4 rounded-xl border border-dashed border-neutral-200 bg-neutral-50 p-2">
           <p className="mb-2 text-[11px] tracking-wider text-fh-muted uppercase">
-            Preview · {slotId}
+            Preview · {slotId} · {HOME_AD_SLOT_PIXELS[slotId].width}×
+            {HOME_AD_SLOT_PIXELS[slotId].height}
           </p>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={banner.imageUrl}
-            alt={banner.alt || title}
-            className="mx-auto max-h-48 w-full object-contain"
-          />
+          <div
+            className="mx-auto overflow-hidden bg-white"
+            style={{
+              width: "100%",
+              maxWidth: HOME_AD_SLOT_PIXELS[slotId].width,
+              aspectRatio: `${HOME_AD_SLOT_PIXELS[slotId].width} / ${HOME_AD_SLOT_PIXELS[slotId].height}`,
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={banner.imageUrl}
+              alt={banner.alt || title}
+              className="h-full w-full object-contain"
+            />
+          </div>
         </div>
       ) : (
         <p className="mt-4 text-sm text-fh-muted">
@@ -244,7 +254,9 @@ export default function AdminAdsPage() {
         </h1>
         <p className="mt-1 text-sm text-fh-muted">
           Browse computer කරලා local banner file එකක් තෝරන්න. ඕන නම් image
-          URL එකක් paste කරන්නත් පුළුවන්. Click link දාලා Save කරන්න.
+          URL එකක් paste කරන්නත් පුළුවන්. Header / footer 728×90 — phone
+          එකේත් desktop එකේත් ratio එක same (320×50 box එකකට stretch වෙන්නේ
+          නෑ).
         </p>
       </div>
 

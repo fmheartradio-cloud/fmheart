@@ -4,6 +4,8 @@ type DirectBannerProps = {
   alt?: string;
   width?: number;
   height?: number;
+  /** Fill the parent width while keeping width/height ratio. */
+  fill?: boolean;
   className?: string;
   objectFit?: "cover" | "contain";
 };
@@ -14,10 +16,11 @@ export function DirectBanner({
   alt = "Advertisement",
   width,
   height,
+  fill = false,
   className = "",
-  objectFit = "cover",
+  objectFit = "contain",
 }: DirectBannerProps) {
-  const sized = Boolean(width && height);
+  const ratio = width && height ? `${width} / ${height}` : undefined;
   const img = (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -25,19 +28,24 @@ export function DirectBanner({
       alt={alt}
       width={width}
       height={height}
-      className={`${sized ? "h-full w-full" : "h-auto w-full"} ${
-        objectFit === "contain" ? "object-contain" : "object-cover"
+      className={`h-full w-full ${
+        objectFit === "cover" ? "object-cover" : "object-contain"
       }`}
     />
   );
 
   const box = (
     <div
-      className={`overflow-hidden bg-neutral-100 ${className}`}
+      className={`mx-auto overflow-hidden bg-neutral-100 ${className}`}
       style={
-        sized
-          ? { width, height, maxWidth: "100%" }
-          : undefined
+        ratio
+          ? {
+              aspectRatio: ratio,
+              width: "100%",
+              maxWidth: fill ? "100%" : width,
+              height: "auto",
+            }
+          : { width: "100%" }
       }
     >
       {img}
@@ -51,7 +59,7 @@ export function DirectBanner({
       href={href}
       target={href.startsWith("/") ? undefined : "_blank"}
       rel={href.startsWith("/") ? undefined : "noopener noreferrer sponsored"}
-      className="block max-w-full"
+      className="block w-full max-w-full"
       aria-label={alt}
     >
       {box}

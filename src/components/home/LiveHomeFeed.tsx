@@ -164,7 +164,9 @@ export function LiveHomeFeed({
             banner={inFeedBanner}
             adsenseKind="inArticle"
             label="In-Feed Ad"
-            className="min-h-[100px]"
+            width={300}
+            height={250}
+            className="bg-neutral-100"
           />
 
           <NewsGrid
@@ -199,7 +201,7 @@ export function LiveHomeFeed({
             width={300}
             height={250}
             format="rectangle"
-            className="min-h-[250px]"
+            className="bg-neutral-100"
           />
           <div className="border border-neutral-200 bg-fh-surface p-4">
             <p className="font-heading text-sm font-bold">WhatsApp Channel</p>

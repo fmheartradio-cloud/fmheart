@@ -13,6 +13,7 @@ type HomeAdSlotProps = {
   className?: string;
   width?: number;
   height?: number;
+  fill?: boolean;
   format?: "auto" | "rectangle" | "horizontal" | "vertical";
   responsive?: boolean;
   fallback?: ReactNode;
@@ -26,10 +27,11 @@ export function HomeAdSlot({
   className = "",
   width,
   height,
+  fill = false,
   format = "auto",
   responsive = true,
   fallback,
-  objectFit = "cover",
+  objectFit = "contain",
 }: HomeAdSlotProps) {
   if (isLiveBanner(banner)) {
     return (
@@ -39,6 +41,7 @@ export function HomeAdSlot({
         alt={banner.alt || label}
         width={width}
         height={height}
+        fill={fill}
         className={className}
         objectFit={objectFit}
       />

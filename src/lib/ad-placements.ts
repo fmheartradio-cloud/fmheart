@@ -18,7 +18,7 @@ export const HOME_AD_SLOTS = [
     nameSi: "ප්‍රධාන Banner",
     location: "Hero slider සහ live radio එකට පහළින්, full content width",
     iab: "Leaderboard",
-    sizes: ["728 × 90 desktop", "320 × 50 / 320 × 100 mobile"],
+    sizes: ["728 × 90 — same ratio on mobile & desktop"],
     minHeight: "90px",
     width: "100% (max ~1280px)",
     type: "AdSense or direct",
@@ -51,7 +51,7 @@ export const HOME_AD_SLOTS = [
     nameSi: "Footer ට ඉහළ Banner",
     location: "Brand promo cards වලට පහළින්, footer ට ඉහළින්",
     iab: "Leaderboard",
-    sizes: ["728 × 90 desktop", "responsive full-width"],
+    sizes: ["728 × 90 — same ratio on mobile & desktop"],
     minHeight: "90px",
     width: "100% (max ~1280px)",
     type: "AdSense or direct",
@@ -68,6 +68,19 @@ export const HOME_AD_SLOTS = [
     type: "Direct only",
   },
 ] as const;
+
+/** Pixel boxes used on the homepage — scale by CSS aspect-ratio, never swap to 320×50. */
+export const HOME_AD_SLOT_PIXELS: Record<
+  (typeof HOME_AD_SLOTS)[number]["id"],
+  { width: number; height: number }
+> = {
+  player: { width: 300, height: 250 },
+  header: { width: 728, height: 90 },
+  inFeed: { width: 300, height: 250 },
+  sidebar: { width: 300, height: 250 },
+  footer: { width: 728, height: 90 },
+  partnerStrip: { width: 1200, height: 160 },
+};
 
 export const PROMOTION_PACKAGES = [
   {

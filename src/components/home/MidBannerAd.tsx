@@ -11,6 +11,9 @@ export function MidBannerAd({ banner }: { banner?: DirectAdBanner | null }) {
             imageUrl={banner.imageUrl}
             href={banner.href || "/promotion"}
             alt={banner.alt || "Partner with FM Heart"}
+            width={1200}
+            height={160}
+            fill
             objectFit="contain"
             className="w-full bg-fh-black"
           />

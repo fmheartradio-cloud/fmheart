@@ -45,27 +45,30 @@ export function AdSenseUnit({
   const boxStyle =
     width && height
       ? {
-          display: "inline-block" as const,
-          width: `${width}px`,
-          height: `${height}px`,
-          maxWidth: "100%",
+          display: "block" as const,
+          width: "100%",
+          maxWidth: `${width}px`,
+          height: "auto",
+          aspectRatio: `${width} / ${height}`,
         }
       : { display: "block" as const, width: "100%", maxWidth: "100%" };
 
   if (!ready) {
     return (
       <div
-        className={`flex min-h-[90px] w-full items-center justify-center border border-dashed border-neutral-300 bg-neutral-100 text-center ${className}`}
+        className={`mx-auto flex w-full items-center justify-center overflow-hidden border border-dashed border-neutral-300 bg-neutral-100 text-center ${className}`}
         aria-label={label}
         style={{
           display: "flex",
-          width: width ? `${width}px` : "100%",
-          height: height ? `${height}px` : undefined,
-          maxWidth: "100%",
+          width: "100%",
+          maxWidth: width ? `${width}px` : "100%",
+          height: "auto",
+          aspectRatio: width && height ? `${width} / ${height}` : undefined,
+          minHeight: width && height ? undefined : 90,
           boxSizing: "border-box",
         }}
       >
-        <div className="px-4 py-3">
+        <div className="px-2 py-1">
           <p className="text-[10px] uppercase tracking-[0.2em] text-fh-muted">
             Google AdSense
           </p>
@@ -79,7 +82,7 @@ export function AdSenseUnit({
 
   return (
     <ins
-      className={`adsbygoogle ${width && height ? "inline-block" : "block w-full"} ${className}`}
+      className={`adsbygoogle mx-auto block w-full overflow-hidden ${className}`}
       style={boxStyle}
       data-ad-client={client}
       data-ad-slot={slot}
