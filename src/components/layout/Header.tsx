@@ -21,6 +21,46 @@ const MAIN_NAV_LINKS = [
   { href: "/contact", label: "CONTACT" },
 ] as const;
 
+function BrandNowPlaying({
+  isPlaying,
+  song,
+  artist,
+  size = "desktop",
+}: {
+  isPlaying: boolean;
+  song: string;
+  artist?: string;
+  size?: "mobile" | "desktop";
+}) {
+  return (
+    <div className="min-w-0 text-center">
+      <p
+        className={`font-sigiri font-extrabold tracking-wide text-fh-ink ${
+          size === "mobile"
+            ? "text-[22px] leading-tight sm:text-[26px]"
+            : "text-[28px] md:text-[30px] lg:text-[34px]"
+        }`}
+      >
+        {SITE.taglineSi}
+      </p>
+      <p
+        className={`mt-0.5 truncate text-fh-muted ${
+          size === "mobile" ? "text-[11px]" : "text-xs"
+        }`}
+      >
+        <span className="font-semibold text-fh-red">
+          {isPlaying ? "ON AIR" : "NOW PLAYING"}
+        </span>
+        <span className="mx-1.5 text-neutral-300">·</span>
+        <span>
+          {song}
+          {artist ? ` — ${artist}` : ""}
+        </span>
+      </p>
+    </div>
+  );
+}
+
 export function Header() {
   const { menuOpen, setMenuOpen } = useUi();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -33,23 +73,12 @@ export function Header() {
           <Logo variant="tagline" />
         </div>
 
-        {/* Desktop: fill empty middle with tagline + now playing */}
         <div className="hidden min-w-0 flex-1 items-center justify-center px-4 lg:flex">
-          <div className="max-w-xl text-center">
-            <p className="font-sigiri text-[28px] font-extrabold tracking-wide text-fh-ink md:text-[30px] lg:text-[34px]">
-              {SITE.taglineSi}
-            </p>
-            <p className="mt-0.5 truncate text-xs text-fh-muted">
-              <span className="font-semibold text-fh-red">
-                {isPlaying ? "ON AIR" : "NOW PLAYING"}
-              </span>
-              <span className="mx-1.5 text-neutral-300">·</span>
-              <span>
-                {meta.song}
-                {meta.artist ? ` — ${meta.artist}` : ""}
-              </span>
-            </p>
-          </div>
+          <BrandNowPlaying
+            isPlaying={isPlaying}
+            song={meta.song}
+            artist={meta.artist}
+          />
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-2 md:gap-3">
@@ -97,6 +126,15 @@ export function Header() {
         </div>
       </div>
 
+      <div className="border-t border-neutral-100 px-3 py-1.5 lg:hidden">
+        <BrandNowPlaying
+          isPlaying={isPlaying}
+          song={meta.song}
+          artist={meta.artist}
+          size="mobile"
+        />
+      </div>
+
       {searchOpen && (
         <div className="border-t border-neutral-100 bg-white px-3 py-3 md:px-4">
           <form
@@ -121,13 +159,13 @@ export function Header() {
         </div>
       )}
 
-      <nav className="hidden bg-fh-red md:block" aria-label="Main">
-        <ul className="mx-auto flex max-w-7xl items-center gap-0.5 overflow-x-auto px-2">
+      <nav className="bg-fh-red" aria-label="Main">
+        <ul className="mx-auto flex w-full min-w-0 max-w-7xl items-center gap-0 overflow-x-auto px-1 md:gap-0.5 md:px-2">
           {MAIN_NAV_LINKS.map((link) => (
-            <li key={link.href}>
+            <li key={link.href} className="shrink-0">
               <Link
                 href={link.href}
-                className="inline-block whitespace-nowrap px-3 py-2.5 font-sans text-[13px] font-semibold tracking-wide text-white/95 transition hover:bg-black/15"
+                className="inline-block whitespace-nowrap px-2.5 py-2 font-sans text-[12px] font-semibold tracking-wide text-white/95 transition hover:bg-black/15 md:px-3 md:py-2.5 md:text-[13px]"
               >
                 {link.label}
               </Link>
