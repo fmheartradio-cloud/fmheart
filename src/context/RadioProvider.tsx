@@ -136,6 +136,8 @@ export function RadioProvider({ children }: { children: ReactNode }) {
 
   const prevMetaRef = useRef<RadioMeta>(DEFAULT_META);
   const wantPlayRef = useRef(false);
+  /** Bumped on every pause so in-flight play/rotate/reconnect work aborts. */
+  const playGenerationRef = useRef(0);
   const appleRef = useRef(false);
   const volumeRef = useRef(0.85);
   const reconnectTimer = useRef<number | null>(null);
@@ -144,6 +146,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   const reconnectAttempts = useRef(0);
   const lastProgressAt = useRef(0);
   const reconnectingRef = useRef(false);
+  const toggleLockRef = useRef(false);
 
   const scheduleReconnectRef = useRef<() => void>(() => {});
   const rotateProxyRef = useRef<() => Promise<void>>(async () => {});
@@ -259,7 +262,13 @@ export function RadioProvider({ children }: { children: ReactNode }) {
 
   /** Point an element at a fresh proxy connection and start it. */
   const openProxy = useCallback(
-    async (idx: number, forceNewSrc: boolean) => {
+    async (idx: number, forceNewSrc: boolean, generation?: number) => {
+      if (!wantPlayRef.current) {
+        throw new Error("play aborted");
+      }
+      if (generation != null && generation !== playGenerationRef.current) {
+        throw new Error("play aborted");
+      }
       const el = proxyEl(idx);
       if (!el) throw new Error("proxy element missing");
       el.muted = false;
@@ -273,7 +282,21 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       if (forceNewSrc || !hasSrc || el.error != null || stale) {
         el.src = withCacheBust(streamProxyUrl());
       }
+      if (!wantPlayRef.current) {
+        throw new Error("play aborted");
+      }
+      if (generation != null && generation !== playGenerationRef.current) {
+        throw new Error("play aborted");
+      }
       await el.play();
+      if (!wantPlayRef.current) {
+        try {
+          el.pause();
+        } catch {
+          /* ignore */
+        }
+        throw new Error("play aborted");
+      }
     },
     [proxyEl],
   );
@@ -291,6 +314,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     if (!wantPlayRef.current || appleRef.current || usingFallbackRef.current) {
       return;
     }
+    const generation = playGenerationRef.current;
     const ctx = ctxRef.current;
     if (!ctx || !graphReadyRef.current) return;
 
@@ -298,8 +322,11 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     const next = cur === 0 ? 1 : 0;
 
     try {
-      await openProxy(next, true);
+      await openProxy(next, true, generation);
     } catch (err) {
+      if (!wantPlayRef.current || generation !== playGenerationRef.current) {
+        return;
+      }
       console.warn("[radio] proxy rotate failed:", err);
       rotateFailures.current += 1;
       if (rotateFailures.current >= 3) {
@@ -308,8 +335,17 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       }
       rotateTimer.current = window.setTimeout(() => {
         rotateTimer.current = null;
-        void rotateProxyRef.current();
+        if (wantPlayRef.current) void rotateProxyRef.current();
       }, 1500);
+      return;
+    }
+
+    if (!wantPlayRef.current || generation !== playGenerationRef.current) {
+      try {
+        proxyEl(next)?.pause();
+      } catch {
+        /* ignore */
+      }
       return;
     }
 
@@ -330,6 +366,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
 
     window.setTimeout(
       () => {
+        if (!wantPlayRef.current) return;
         if (activeIdxRef.current === next) {
           const old = proxyEl(cur);
           try {
@@ -348,7 +385,11 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   rotateProxyRef.current = rotateProxy;
 
   /** Direct Icecast playback (Apple, or when the proxy is unavailable). */
-  const startFallbackPlayback = useCallback(async () => {
+  const startFallbackPlayback = useCallback(async (generation?: number) => {
+    if (!wantPlayRef.current) throw new Error("play aborted");
+    if (generation != null && generation !== playGenerationRef.current) {
+      throw new Error("play aborted");
+    }
     stopProxies();
     usingFallbackRef.current = true;
     setSpectrumMode("simulated");
@@ -365,7 +406,19 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
+    if (!wantPlayRef.current) throw new Error("play aborted");
+    if (generation != null && generation !== playGenerationRef.current) {
+      throw new Error("play aborted");
+    }
     await audio.play();
+    if (!wantPlayRef.current) {
+      try {
+        audio.pause();
+      } catch {
+        /* ignore */
+      }
+      throw new Error("play aborted");
+    }
   }, [stopProxies]);
 
   /**
@@ -373,14 +426,22 @@ export function RadioProvider({ children }: { children: ReactNode }) {
    * One stream feeds both speakers and FFT, so the bars match the beat.
    * Prefer NEXT_PUBLIC_STREAM_PROXY_URL (Cloudflare) to avoid Vercel bandwidth.
    */
-  const startSyncedPlayback = useCallback(async () => {
+  const startSyncedPlayback = useCallback(async (generation?: number) => {
     if (appleRef.current || !SITE.realtimeSpectrum) return false;
+    if (!wantPlayRef.current) return false;
+    if (generation != null && generation !== playGenerationRef.current) {
+      return false;
+    }
     if (!buildGraph()) return false;
 
     const ctx = ctxRef.current;
     if (!ctx) return false;
     if (ctx.state === "suspended") {
       await ctx.resume();
+    }
+    if (!wantPlayRef.current) return false;
+    if (generation != null && generation !== playGenerationRef.current) {
+      return false;
     }
 
     // Silence the fallback element so nothing plays twice
@@ -400,17 +461,25 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await openProxy(idx, false);
-    } catch {
+      await openProxy(idx, false, generation);
+    } catch (err) {
+      if (!wantPlayRef.current || generation !== playGenerationRef.current) {
+        return false;
+      }
       // One cold retry with a fresh connection
-      await openProxy(idx, true);
+      await openProxy(idx, true, generation);
+    }
+
+    if (!wantPlayRef.current || generation !== playGenerationRef.current) {
+      stopProxies();
+      return false;
     }
 
     rotateFailures.current = 0;
     setSpectrumMode("realtime");
     scheduleRotate();
     return true;
-  }, [buildGraph, openProxy, scheduleRotate]);
+  }, [buildGraph, openProxy, scheduleRotate, stopProxies]);
 
   const scheduleReconnect = useCallback(() => {
     if (!wantPlayRef.current) return;
@@ -423,10 +492,11 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     const attempt = reconnectAttempts.current;
     const delay = Math.min(800 * Math.pow(1.6, attempt), 8000);
     reconnectAttempts.current = attempt + 1;
+    const generation = playGenerationRef.current;
 
     reconnectTimer.current = window.setTimeout(() => {
       reconnectTimer.current = null;
-      if (!wantPlayRef.current) {
+      if (!wantPlayRef.current || generation !== playGenerationRef.current) {
         reconnectingRef.current = false;
         return;
       }
@@ -434,9 +504,9 @@ export function RadioProvider({ children }: { children: ReactNode }) {
       setError(null);
 
       const attemptPlay = appleRef.current
-        ? startFallbackPlayback()
-        : startSyncedPlayback().then((ok) => {
-            if (!ok) return startFallbackPlayback();
+        ? startFallbackPlayback(generation)
+        : startSyncedPlayback(generation).then((ok) => {
+            if (!ok) return startFallbackPlayback(generation);
           });
 
       void attemptPlay
@@ -445,14 +515,16 @@ export function RadioProvider({ children }: { children: ReactNode }) {
         })
         .catch(() => {
           reconnectingRef.current = false;
-          if (!wantPlayRef.current) return;
+          if (!wantPlayRef.current || generation !== playGenerationRef.current) {
+            return;
+          }
           if (reconnectAttempts.current >= 8) {
             setError("Stream එක reconnect වුණේ නැහැ. Play නැවත ඔබන්න.");
             setIsLoading(false);
             return;
           }
           // Next retry falls back to the direct stream
-          void startFallbackPlayback().catch(() => scheduleReconnect());
+          void startFallbackPlayback(generation).catch(() => scheduleReconnect());
         });
     }, delay);
   }, [
@@ -726,6 +798,7 @@ export function RadioProvider({ children }: { children: ReactNode }) {
 
   const play = useCallback(async () => {
     wantPlayRef.current = true;
+    const generation = playGenerationRef.current;
     reconnectAttempts.current = 0;
     reconnectingRef.current = false;
     rotateFailures.current = 0;
@@ -737,15 +810,49 @@ export function RadioProvider({ children }: { children: ReactNode }) {
 
     try {
       if (appleRef.current) {
-        await startFallbackPlayback();
+        await startFallbackPlayback(generation);
+        if (!wantPlayRef.current || generation !== playGenerationRef.current) {
+          return;
+        }
         return;
       }
-      const ok = await startSyncedPlayback();
-      if (!ok) await startFallbackPlayback();
+      const ok = await startSyncedPlayback(generation);
+      if (!wantPlayRef.current || generation !== playGenerationRef.current) {
+        stopProxies();
+        setIsPlaying(false);
+        setIsLoading(false);
+        return;
+      }
+      if (!ok) await startFallbackPlayback(generation);
+      if (!wantPlayRef.current || generation !== playGenerationRef.current) {
+        stopProxies();
+        const audio = audioRef.current;
+        try {
+          audio?.pause();
+        } catch {
+          /* ignore */
+        }
+        setIsPlaying(false);
+        setIsLoading(false);
+      }
     } catch (err) {
+      if (!wantPlayRef.current || generation !== playGenerationRef.current) {
+        setIsLoading(false);
+        setIsPlaying(false);
+        return;
+      }
       try {
-        await startFallbackPlayback();
+        await startFallbackPlayback(generation);
+        if (!wantPlayRef.current || generation !== playGenerationRef.current) {
+          setIsLoading(false);
+          setIsPlaying(false);
+        }
       } catch (err2) {
+        if (!wantPlayRef.current || generation !== playGenerationRef.current) {
+          setIsLoading(false);
+          setIsPlaying(false);
+          return;
+        }
         wantPlayRef.current = false;
         setIsLoading(false);
         setIsPlaying(false);
@@ -754,6 +861,11 @@ export function RadioProvider({ children }: { children: ReactNode }) {
           setError(
             "Browser එකේ autoplay block කරලා තියෙනවා. Play නැවත touch කරන්න.",
           );
+        } else if (
+          err2 instanceof Error &&
+          err2.message === "play aborted"
+        ) {
+          /* user paused while connecting */
         } else {
           setError("Play කිරීම අසාර්ථකයි. නැවත try කරන්න.");
         }
@@ -765,14 +877,17 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     clearWaitingWatch,
     startFallbackPlayback,
     startSyncedPlayback,
+    stopProxies,
   ]);
 
   const pause = useCallback(() => {
     wantPlayRef.current = false;
+    playGenerationRef.current += 1;
     reconnectAttempts.current = 0;
     reconnectingRef.current = false;
     clearReconnect();
     clearWaitingWatch();
+    clearRotate();
     stopProxies();
 
     const audio = audioRef.current;
@@ -785,13 +900,19 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     }
     setIsPlaying(false);
     setIsLoading(false);
-  }, [clearReconnect, clearWaitingWatch, stopProxies]);
+  }, [clearReconnect, clearRotate, clearWaitingWatch, stopProxies]);
 
   const toggle = useCallback(async () => {
-    // Intent flag only — avoids resume/pause races with loading UI state
-    if (wantPlayRef.current) pause();
+    if (toggleLockRef.current) return;
+    toggleLockRef.current = true;
+    window.setTimeout(() => {
+      toggleLockRef.current = false;
+    }, 400);
+
+    // Prefer UI playing state so a stuck wantPlay flag cannot skip pause.
+    if (wantPlayRef.current || isPlaying || isLoading) pause();
     else await play();
-  }, [pause, play]);
+  }, [isLoading, isPlaying, pause, play]);
 
   /** pointerdown on Play — unlock AudioContext inside the gesture. */
   const primeSpectrum = useCallback(() => {
