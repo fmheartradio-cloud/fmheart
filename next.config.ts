@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Keep sharp as a native Node package so newsbot watermark detect loads on Vercel.
+  // sharp is native; optional on Cloudflare Workers. libsql talks HTTP to Turso.
   serverExternalPackages: ["sharp", "@libsql/client"],
   images: {
     // CMS users paste arbitrary cover URLs (Blogger, FB, Unsplash, etc.)
@@ -13,3 +13,6 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
+initOpenNextCloudflareForDev();

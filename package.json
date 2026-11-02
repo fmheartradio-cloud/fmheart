@@ -7,13 +7,17 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "preview:cf": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy:cf": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "seed:gossip": "node scripts/seed-gossip.mjs",
     "seed:content": "node scripts/seed-more-content.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.15.15",
+    "@opennextjs/cloudflare": "^1.20.15",
     "lucide-react": "^1.27.0",
-    "next": "16.2.12",
+    "next": "^16.4.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "sharp": "0.34.5"
@@ -24,8 +28,9 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.12",
+    "eslint-config-next": "^16.4.3",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.156.1"
   }
 }

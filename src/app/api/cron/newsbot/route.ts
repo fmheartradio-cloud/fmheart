@@ -21,7 +21,7 @@ async function handle(req: Request) {
       {
         ok: false,
         error:
-          "Turso not configured. Add TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in Vercel Environment Variables.",
+          "Turso not configured. Add TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in host environment variables.",
       },
       { status: 503 },
     );

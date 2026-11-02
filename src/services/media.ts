@@ -1,5 +1,4 @@
 import { getAdminDb } from "@/lib/db/compat";
-import sharp from "sharp";
 
 const COL = "media";
 const MAX_BYTES = 4 * 1024 * 1024;
@@ -41,23 +40,7 @@ export async function saveImageUpload(
   }
 
   const input = Buffer.from(await file.arrayBuffer());
-  let mime = "image/jpeg";
-  let data: Buffer;
-
-  try {
-    data = await sharp(input)
-      .rotate()
-      .resize({
-        width: 1600,
-        height: 900,
-        fit: "inside",
-        withoutEnlargement: true,
-      })
-      .jpeg({ quality: 82, mozjpeg: true })
-      .toBuffer();
-  } catch {
-    throw new Error("Image එක කියවන්න බැරි වුණා. වෙන file එකක් try කරන්න.");
-  }
+  const { data, mime } = await compressUpload(input, file.type);
 
   const id = `img-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const payload: StoredMedia = {
@@ -69,6 +52,31 @@ export async function saveImageUpload(
   };
   await db.collection(COL).doc(id).set({ ...payload });
   return { id, url: `/api/media/${id}` };
+}
+
+async function compressUpload(
+  input: Buffer,
+  fileType: string,
+): Promise<{ data: Buffer; mime: string }> {
+  try {
+    const sharp = (await import("sharp")).default;
+    const data = await sharp(input)
+      .rotate()
+      .resize({
+        width: 1600,
+        height: 900,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 82, mozjpeg: true })
+      .toBuffer();
+    return { data, mime: "image/jpeg" };
+  } catch (err) {
+    console.warn("[media] sharp unavailable, storing original:", err);
+    const mime =
+      fileType && fileType.startsWith("image/") ? fileType : "image/jpeg";
+    return { data: input, mime };
+  }
 }
 
 export async function getStoredMedia(id: string): Promise<StoredMedia | null> {
