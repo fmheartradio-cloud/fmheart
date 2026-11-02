@@ -1,21 +1,14 @@
-import type { Sharp } from "sharp";
-
 const FETCH_TIMEOUT_MS = 12000;
 const MAX_ANALYZE_WIDTH = 720;
 
-type SharpFn = (input?: Buffer | Uint8Array | string) => Sharp;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SharpFn = (input?: Buffer | Uint8Array | string) => any;
 
 async function getSharp(): Promise<SharpFn | null> {
-  try {
-    const mod = (await import("sharp")) as unknown as {
-      default?: SharpFn;
-    } & SharpFn;
-    const fn = typeof mod.default === "function" ? mod.default : mod;
-    return typeof fn === "function" ? fn : null;
-  } catch (err) {
-    console.warn("[watermark-detect] sharp unavailable:", err);
-    return null;
-  }
+  const mod = await import("@/lib/load-sharp").then((m) => m.loadSharp());
+  if (!mod) return null;
+  const fn = typeof mod.default === "function" ? mod.default : null;
+  return typeof fn === "function" ? (fn as SharpFn) : null;
 }
 
 /** Ada Derana burns a 3-language boxed logo (usually bottom-left). */

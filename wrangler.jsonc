@@ -14,6 +14,10 @@
   "observability": {
     "enabled": true
   },
+  // Workers Paid required for OpenNext/Next.js (Free plan is only 10ms CPU → error 1102).
+  "limits": {
+    "cpu_ms": 60000
+  },
   "vars": {
     "NEXT_PUBLIC_SITE_URL": "https://www.fmheart.lk",
     "NEXT_PUBLIC_ADMIN_EMAILS": "fmheartradio@gmail.com"

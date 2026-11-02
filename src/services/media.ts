@@ -59,7 +59,9 @@ async function compressUpload(
   fileType: string,
 ): Promise<{ data: Buffer; mime: string }> {
   try {
-    const sharp = (await import("sharp")).default;
+    const sharpMod = await import("@/lib/load-sharp").then((m) => m.loadSharp());
+    if (!sharpMod) throw new Error("sharp unavailable");
+    const sharp = sharpMod.default;
     const data = await sharp(input)
       .rotate()
       .resize({
