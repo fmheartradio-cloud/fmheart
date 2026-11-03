@@ -27,5 +27,9 @@
       "binding": "WORKER_SELF_REFERENCE",
       "service": "fmheartradio"
     }
+  ],
+  "routes": [
+    { "pattern": "fmheart.lk/*", "zone_name": "fmheart.lk" },
+    { "pattern": "www.fmheart.lk/*", "zone_name": "fmheart.lk" }
   ]
 }
