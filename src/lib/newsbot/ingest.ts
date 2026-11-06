@@ -2237,6 +2237,49 @@ export async function runNewsIngest(options?: {
     });
   }
 
+  // Catch-up: published news that never got a Facebook post (e.g. expired token window).
+  if (fbEnabled && facebookPosted < fbMax) {
+    const postedBefore = facebookPosted;
+    try {
+      const backlog = await db
+        .collection("articles")
+        .where("status", "==", "published")
+        .orderBy("publishedAt", "desc")
+        .limit(40)
+        .get();
+      for (const doc of backlog.docs) {
+        if (facebookPosted >= fbMax) break;
+        const data = doc.data();
+        if (String(data.type || "news") === "gossip") continue;
+        if (String(data.facebookPostId || "").trim()) continue;
+        if (!String(data.slug || "").trim() || !String(data.title || "").trim()) {
+          continue;
+        }
+        await maybePostFacebook(doc.id, data);
+      }
+      results.push({
+        source: "Facebook backlog",
+        fetched: backlog.docs.length,
+        created: 0,
+        skipped: 0,
+        backfilled: Math.max(0, facebookPosted - postedBefore),
+        publishedDrafts: 0,
+        categoriesUpdated: 0,
+      });
+    } catch (err) {
+      results.push({
+        source: "Facebook backlog",
+        fetched: 0,
+        created: 0,
+        skipped: 0,
+        backfilled: 0,
+        publishedDrafts: 0,
+        categoriesUpdated: 0,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   return {
     ok: true,
     results,
